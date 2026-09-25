@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { getPrototypeSnapshot } from '../src/data/repository'
 import { answerStatelessChat } from './statelessChat'
 import handler from '../api/chat'
@@ -21,12 +23,19 @@ describe('Vercel stateless chat', () => {
   })
 
   it('serves the Vercel route and rejects unsupported methods', async () => {
-    const unsupported = await handler.fetch(new Request('https://example.test/api/chat'))
-    expect(unsupported.status).toBe(405)
-    const snapshot = getPrototypeSnapshot()
-    const response = await handler.fetch(new Request('https://example.test/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ snapshot, message: `Bagaimana data ${snapshot.records[0].name}?` }) }))
-    expect(response.status).toBe(200)
-    expect((await response.json() as { answer: string }).answer).toContain(snapshot.records[0].name)
+    const server = createServer(handler)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat`
+    try {
+      const unsupported = await fetch(url)
+      expect(unsupported.status).toBe(405)
+      const snapshot = getPrototypeSnapshot()
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot, message: `Bagaimana data ${snapshot.records[0].name}?` }) })
+      expect(response.status).toBe(200)
+      expect((await response.json() as { answer: string }).answer).toContain(snapshot.records[0].name)
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
   })
 })
