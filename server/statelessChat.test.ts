@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { getPrototypeSnapshot } from '../src/data/repository'
 import { answerStatelessChat } from './statelessChat'
-import handler from '../api/chat'
+import handler from './vercelChat'
 
 describe('Vercel stateless chat', () => {
   it('answers from the submitted snapshot and keeps identity turns out of Gemini history', async () => {

@@ -8,7 +8,8 @@
     "dev:api": "tsx watch server/index.ts",
     "dev:web": "vite",
     "api": "tsx server/index.ts",
-    "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
+    "build": "npm run build:function && tsc -b && tsc -p tsconfig.server.json && vite build",
+    "build:function": "esbuild server/vercelChat.ts --bundle --platform=node --format=esm --target=node24 --outfile=api/chat.mjs",
     "test": "vitest run",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -29,6 +30,7 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
+    "esbuild": "^0.28.2",
     "oxlint": "^1.81.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2",
