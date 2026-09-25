@@ -3,6 +3,7 @@ import { Send } from 'lucide-react'
 import { sendChat } from '../api/client'
 import { useWorkforceSession } from '../data/useWorkforceSession'
 import type { WorkforceFilters } from '../types/workforce'
+import { ChatMarkdown } from './ChatMarkdown'
 
 type Message = { role: 'user' | 'assistant'; text: string }
 
@@ -40,7 +41,9 @@ export function ChatPanel({ sessionId, filters, query, count }: { sessionId: str
 
   return <div className="workforce-chat">
     <div className="workforce-chat-messages" ref={messageList} role="log" aria-live="polite">
-      {messages.length ? messages.map((message, index) => <p key={index} className={`workforce-chat-message ${message.role}`}>{message.text}</p>)
+      {messages.length ? messages.map((message, index) => message.role === 'assistant'
+        ? <div key={index} className="workforce-chat-message assistant"><ChatMarkdown text={message.text}/></div>
+        : <p key={index} className="workforce-chat-message user">{message.text}</p>)
         : <p className="workforce-chat-placeholder">{count < 5 ? 'Tanyakan status, divisi, atau karyawan pada hasil filter ini.' : 'Tanyakan ringkasan, status, divisi, atau karyawan pada data.'}</p>}
       {busy && <p className="workforce-chat-placeholder">AI sedang menjawab...</p>}
     </div>
