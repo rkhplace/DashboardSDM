@@ -23,10 +23,12 @@ async function readBody(request: RequestWithBody): Promise<unknown> {
 export default async function handler(request: RequestWithBody, response: ServerResponse) {
   if (request.method !== 'POST') return json(response, 405, { code: 'METHOD_NOT_ALLOWED', message: 'Metode tidak didukung.' })
   if (!request.headers['content-type']?.startsWith('application/json')) return json(response, 415, { code: 'CONTENT_TYPE', message: 'Kirim JSON.' })
+  let diagnosticRequest = false
   try {
     const contentLength = Number(request.headers['content-length'] ?? 0)
     if (contentLength > MAX_BODY) return json(response, 413, { code: 'REQUEST_TOO_LARGE', message: 'Data melebihi batas 4 MB.' })
     const body = await readBody(request)
+    diagnosticRequest = typeof body === 'object' && body !== null && !Array.isArray(body) && Object.keys(body).length === 0
     const { answerStatelessChat } = await import('../server/statelessChat.ts')
     return json(response, 200, await answerStatelessChat(body))
   } catch (error) {
@@ -37,6 +39,7 @@ export default async function handler(request: RequestWithBody, response: Server
       return json(response, error.status, { code: error.code, message: error.message })
     }
     console.error('Chat function failed', error)
-    return json(response, 500, { code: 'INTERNAL_ERROR', message: 'Server mengalami kesalahan.' })
+    const detail = diagnosticRequest && error instanceof Error ? `${error.name}: ${error.message.slice(0, 180)}` : undefined
+    return json(response, 500, { code: 'INTERNAL_ERROR', message: 'Server mengalami kesalahan.', ...(detail ? { detail } : {}) })
   }
 }
