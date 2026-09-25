@@ -70,7 +70,7 @@ export function ImportPage() {
         {pending && <div className="landing-period"><p>Periode tidak ditemukan pada nama sheet atau file. Pilih bulan data untuk melanjutkan.</p><div><input aria-label="Periode data" type="month" value={period} onChange={event => setPeriod(event.target.value)} /><button type="button" disabled={!period || loading} onClick={() => { void finish(pending.inspection, pending.filename, period) }}>Lanjut ke dashboard</button></div></div>}
         {error && <p className="landing-error" role="alert">{error}</p>}
       </section>
-      <p className="landing-footnote">File dibaca di browser; data sesi dikirim ke backend lokal untuk chatbot dan hilang saat sesi berakhir.</p>
+      <p className="landing-footnote">File dibaca di browser; data sesi dipakai chatbot saat bertanya dan hilang saat halaman ditutup.</p>
     </div>
   </div>
 }

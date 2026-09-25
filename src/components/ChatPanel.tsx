@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Send } from 'lucide-react'
 import { sendChat } from '../api/client'
+import { useWorkforceSession } from '../data/useWorkforceSession'
 import type { WorkforceFilters } from '../types/workforce'
 
 type Message = { role: 'user' | 'assistant'; text: string }
 
 export function ChatPanel({ sessionId, filters, query, count }: { sessionId: string; filters: WorkforceFilters; query: string; count: number }) {
+  const { snapshot } = useWorkforceSession()
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string>()
   const [messages, setMessages] = useState<Message[]>([])
@@ -26,7 +28,7 @@ export function ChatPanel({ sessionId, filters, query, count }: { sessionId: str
     setBusy(true)
     setMessages(current => [...current, { role: 'user' as const, text: message }].slice(-100))
     try {
-      const reply = await sendChat(sessionId, message, filters, query, conversationId)
+      const reply = await sendChat(sessionId, snapshot!, message, filters, query, messages, conversationId)
       setConversationId(reply.conversationId)
       setMessages(current => [...current, { role: 'assistant' as const, text: reply.answer }].slice(-100))
     } catch (cause) {

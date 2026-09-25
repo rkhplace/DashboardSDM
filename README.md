@@ -13,6 +13,10 @@ npm run dev
 
 `npm run dev` menyalakan Vite dan API lokal pada `127.0.0.1:8787`. File `.env` sudah disiapkan; isi `GEMINI_API_KEY` dengan key dari Google AI Studio untuk mencoba chatbot, lalu mulai ulang server. File `.env` diabaikan oleh Git. Tanpa key, upload dan dashboard tetap berjalan, tetapi chatbot menampilkan pesan konfigurasi saat ditanya. Model awal adalah `gemini-3.1-flash-lite` dan dapat diganti melalui `GEMINI_MODEL`.
 
+## Deploy di Vercel
+
+Gunakan framework Vite dengan output `dist`. Folder `api` menyediakan Vercel Function untuk chatbot; `vercel.json` menangani URL halaman dashboard. Pada deployment, upload dan dashboard memakai data di memori browser. Setiap pertanyaan chatbot mengirim snapshot aktif ke fungsi backend Vercel, tanpa database atau sesi server. Untuk mengaktifkan AI, atur `GEMINI_API_KEY` sebagai environment variable pada proyek Vercel lalu redeploy. Nilai pada `.env` lokal tidak otomatis tersedia di Vercel. Batas payload Vercel Function berlaku untuk ukuran data yang dikirim saat chat.
+
 Buka URL lokal yang ditampilkan Vite. Halaman awal menampilkan logo PT INTI dan satu kotak upload. Pilih `.xlsx`; aplikasi membaca dan memeriksa file, mengambil periode dari nama sheet atau nama file, lalu langsung membuka dashboard. Jika periode tidak ditemukan, pilih bulan data pada kotak upload untuk melanjutkan. Dashboard adalah satu halaman berisi KPI, grafik, matriks, daftar karyawan, dan chatbot pada kartu AI. Memuat ulang aplikasi mengembalikan alur ke upload; data sesi disimpan hanya pada memori backend lokal selama paling lama satu jam, tanpa database atau browser storage.
 
 Untuk verifikasi:
