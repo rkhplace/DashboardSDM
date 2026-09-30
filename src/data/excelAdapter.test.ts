@@ -17,6 +17,9 @@ describe('Excel adapter against supplied workbook', () => {
     const quality = validateInspection(result, '2026-07-31')
     expect(quality.critical).toEqual([])
     expect(quality.warnings.find(issue => issue.label === 'Band tidak tersedia')?.count).toBe(107)
+    expect(quality.warnings.find(issue => issue.label === 'Activity kosong')?.count).toBe(100)
+    expect(quality.warnings.find(issue => issue.label === 'Band tidak tersedia')?.nips).toHaveLength(107)
+    expect(result.errorCells.length).toBeGreaterThanOrEqual(0)
   })
   it('uses the last day of the selected month and requires a valid period', () => {
     expect(lastDayOfMonth('2026-07')).toBe('2026-07-31')

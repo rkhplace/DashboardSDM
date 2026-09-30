@@ -58,3 +58,11 @@ export interface WorkforceFilters {
 export const emptyFilters: WorkforceFilters = {
   directorate: [], division: [], status: [], gender: [], band: [], ageGroup: [], tenureGroup: [], education: [],
 }
+
+/** Small bar chart the chatbot attaches to an answer, built from query_workforce output. */
+export interface ChatChart {
+  title: string
+  unit: string
+  data: { label: string; value: number }[]
+  truncated: boolean
+}

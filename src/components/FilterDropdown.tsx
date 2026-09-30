@@ -8,9 +8,11 @@ type Props = {
   onChange: (values: string[]) => void
   multiple?: boolean
   display?: (value: string) => string
+  /** Show the "Semua" (clear) option. Off for settings that always need a value. */
+  allowAll?: boolean
 }
 
-export function FilterDropdown({ label, options, selected, onChange, multiple = false, display = value => value }: Props) {
+export function FilterDropdown({ label, options, selected, onChange, multiple = false, display = value => value, allowAll = true }: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const root = useRef<HTMLDivElement>(null)
@@ -40,7 +42,7 @@ export function FilterDropdown({ label, options, selected, onChange, multiple = 
     {open && <div className="filter-dropdown-popover" id={id}>
       {options.length > 7 && <label className="filter-dropdown-search"><Search size={14}/><input autoFocus value={search} onChange={event => setSearch(event.target.value)} placeholder={`Cari ${label.toLowerCase()}...`} aria-label={`Cari ${label}`}/></label>}
       <div className="filter-dropdown-options" role="listbox" aria-label={label} aria-multiselectable={multiple || undefined}>
-        <button type="button" role="option" aria-selected={selected.length === 0} className="filter-dropdown-option" onClick={() => { onChange([]); if (!multiple) setOpen(false) }}><span>Semua</span>{selected.length === 0 && <Check size={14}/>}</button>
+        {allowAll && <button type="button" role="option" aria-selected={selected.length === 0} className="filter-dropdown-option" onClick={() => { onChange([]); if (!multiple) setOpen(false) }}><span>Semua</span>{selected.length === 0 && <Check size={14}/>}</button>}
         {matches.map(option => <button type="button" role="option" aria-selected={selected.includes(option)} key={option} className="filter-dropdown-option" onClick={() => choose(option)}><span>{display(option)}</span>{selected.includes(option) && <Check size={14}/>}</button>)}
         {!matches.length && <p className="filter-dropdown-empty">Tidak ada pilihan yang cocok.</p>}
       </div>

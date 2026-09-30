@@ -1,7 +1,7 @@
 import { type AddressInfo } from 'node:net'
 import { describe, expect, it } from 'vitest'
 import { getPrototypeSnapshot } from '../src/data/repository'
-import { createApp } from './app'
+import { createApp, presentAnswer } from './app'
 
 describe('AI session API', () => {
   it('sends aggregate questions to AI with a query tool scoped to the active file and filter', async () => {
@@ -56,5 +56,14 @@ describe('AI session API', () => {
     } finally {
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
     }
+  })
+})
+
+describe('answer cleanup', () => {
+  it('drops JSON echoed by the model but keeps the prose', () => {
+    const answer = 'Mayoritas ada di Divisi Pendukung Usaha.\n{ "operation": "count", "groupBy": [ "division" ], "results": [ { "division": "A", "count": 77 } ] }'
+    expect(presentAnswer(answer)).toBe('Mayoritas ada di Divisi Pendukung Usaha.')
+    expect(presentAnswer('Hasil:\n```json\n{"a":1}\n```\nSelesai.')).toBe('Hasil:\n\nSelesai.')
+    expect(presentAnswer('Rentang usia [26–30] paling banyak.')).toBe('Rentang usia [26–30] paling banyak.')
   })
 })

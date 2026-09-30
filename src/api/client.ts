@@ -1,4 +1,4 @@
-import type { EmployeeSnapshot, WorkforceFilters } from '../types/workforce'
+import type { ChatChart, EmployeeSnapshot, WorkforceFilters } from '../types/workforce'
 
 async function api<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response
@@ -30,6 +30,8 @@ export interface ChatReply {
   answer: string
   evidence: { metric: string; value: number; period: string }[]
   limitations: string[]
+  charts?: ChatChart[]
+  suggestedFilters?: WorkforceFilters | null
 }
 
 export function sendChat(sessionId: string, snapshot: EmployeeSnapshot, message: string, filters: WorkforceFilters, query: string, history: { role: 'user' | 'assistant'; text: string }[], conversationId?: string): Promise<ChatReply> {

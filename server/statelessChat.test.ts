@@ -12,12 +12,15 @@ describe('Vercel stateless chat', () => {
     const reply = await answerStatelessChat({ snapshot, message: 'Bandingkan rata-rata usia per divisi.', history: [
       { role: 'user', text: `Bagaimana data ${snapshot.records[0].name}?` },
       { role: 'assistant', text: `${snapshot.records[0].name} bekerja di ${snapshot.records[0].division}.` },
-    ] }, async (text, runQuery) => {
+    ] }, async (text, runQuery, applyFilters) => {
       prompt = text
       const result = runQuery?.({ operation: 'average', field: 'age', groupBy: ['division'] }) as { totalGroups: number }
+      applyFilters?.({ status: ['Aktif'] })
       return { answer: `Ada ${result.totalGroups} divisi untuk dibandingkan.` }
     })
     expect(reply.answer).toContain('10 divisi')
+    expect(reply.charts?.[0]?.title).toBe('Rata-rata usia per divisi')
+    expect(reply.suggestedFilters?.status).toEqual(['Aktif'])
     expect(prompt).not.toContain(snapshot.records[0].name)
     expect(prompt).toContain('query_workforce')
   })
