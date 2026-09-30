@@ -91,12 +91,17 @@ export function queryWorkforce(input: unknown, records: EmployeeRecord[], asOf: 
   return { ...base, groupBy, totalGroups: groups.size, truncated: groups.size > 60, groups: [...groups.values()].sort((a, b) => b.count - a.count).slice(0, 60).map(item => ({ ...item, shareOfMatched: matched.length ? item.count / matched.length : 0 })) }
 }
 
+// Cell values come from uploaded Excel files: strip control chars/markup and cap length before they reach the prompt.
+export function promptSafe(value: string | number): string {
+  return String(value).replace(/\p{Cc}|[<>`{}]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)
+}
+
 export function workforceCatalog(records: EmployeeRecord[], asOf: string) {
   const categorical = FIELDS.filter(field => !numericFields.has(field))
   return {
     fields: FIELDS,
     numericFields: [...numericFields],
-    categories: Object.fromEntries(categorical.map(field => [field, [...new Set(records.map(record => valueOf(record, field, asOf) ?? 'Tidak tersedia'))].slice(0, 80)])),
+    categories: Object.fromEntries(categorical.map(field => [field, [...new Set(records.map(record => promptSafe(valueOf(record, field, asOf) ?? 'Tidak tersedia')))].filter(Boolean).slice(0, 80)])),
   }
 }
 

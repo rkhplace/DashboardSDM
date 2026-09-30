@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { getPrototypeSnapshot } from '../src/data/repository'
 import { answerStatelessChat } from './statelessChat'
-import handler from './vercelChat'
+import handler, { rateLimited } from './vercelChat'
 
 describe('Vercel stateless chat', () => {
   it('answers from the submitted snapshot and keeps identity turns out of Gemini history', async () => {
@@ -37,5 +37,25 @@ describe('Vercel stateless chat', () => {
     } finally {
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
     }
+  })
+
+  it('rejects cross-origin callers', async () => {
+    const server = createServer(handler)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat`
+    try {
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: '{}' })
+      expect(response.status).toBe(403)
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
+  })
+
+  it('rate limits a single client per window', () => {
+    const now = 1_000_000
+    const results = Array.from({ length: 25 }, () => rateLimited('203.0.113.9', now))
+    expect(results.slice(0, 20).every(limited => !limited)).toBe(true)
+    expect(results.slice(20).every(Boolean)).toBe(true)
+    expect(rateLimited('203.0.113.9', now + 61_000)).toBe(false)
   })
 })
