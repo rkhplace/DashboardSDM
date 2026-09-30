@@ -1,10 +1,11 @@
+import { filterTool } from './chatExtras.ts'
 import { workforceTool } from './query.ts'
 
 export interface GeminiReply { answer: string; evidence?: { metric: string; value: number }[] }
 
 type Step = { type?: string; name?: string; id?: string; arguments?: unknown; content?: { type?: string; text?: string }[] }
 
-export async function askGemini(prompt: string, runQuery?: (arguments_: unknown) => unknown): Promise<GeminiReply> {
+export async function askGemini(prompt: string, runQuery?: (arguments_: unknown) => unknown, applyFilters?: (arguments_: unknown) => unknown): Promise<GeminiReply> {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new ServiceError(503, 'AI_NOT_CONFIGURED', 'GEMINI_API_KEY belum diatur pada backend.')
   const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
@@ -14,7 +15,7 @@ export async function askGemini(prompt: string, runQuery?: (arguments_: unknown)
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({ model, store: false, input: history, ...(runQuery ? { tools: [workforceTool] } : {}) }),
+      body: JSON.stringify({ model, store: false, input: history, ...(runQuery ? { tools: applyFilters ? [workforceTool, filterTool] : [workforceTool] } : {}) }),
       signal: AbortSignal.timeout(25000),
     })
     if (!response.ok) {
@@ -28,7 +29,8 @@ export async function askGemini(prompt: string, runQuery?: (arguments_: unknown)
     if (calls.length && runQuery) {
       if (calls.length > 6) throw new ServiceError(502, 'AI_TOOL_LIMIT', 'Analisis membutuhkan terlalu banyak perhitungan sekaligus. Coba pertanyaan yang lebih spesifik.')
       for (const call of calls) {
-        const output = call.name === 'query_workforce' ? runQuery(call.arguments) : { error: 'Alat tidak dikenal.' }
+        const output = call.name === 'query_workforce' ? runQuery(call.arguments)
+          : call.name === 'set_dashboard_filters' && applyFilters ? applyFilters(call.arguments) : { error: 'Alat tidak dikenal.' }
         if (output && typeof output === 'object' && !Array.isArray(output)) {
           const data = output as Record<string, unknown>
           const metric = typeof data.operation === 'string' ? data.operation : 'query'

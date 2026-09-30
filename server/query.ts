@@ -58,7 +58,8 @@ export function queryWorkforce(input: unknown, records: EmployeeRecord[], asOf: 
   if (!query) return { error: 'Parameter query tidak valid. Gunakan field dan operator dari deklarasi alat.' }
   const matched = records.filter(record => (query.filters ?? []).every(filter => matches(record, filter, asOf)))
   const base = { operation: query.operation, population: records.length, matched: matched.length, shareOfPopulation: records.length ? matched.length / records.length : 0, filters: query.filters ?? [] }
-  if (query.operation === 'count') return base
+  // count + groupBy is treated as a distribution so the breakdown (and chart) is not lost.
+  if (query.operation === 'count' && !query.groupBy?.length) return base
   if (query.operation === 'average') {
     const values = matched.map(record => valueOf(record, query.field!, asOf)).filter((value): value is number => typeof value === 'number')
     if (query.groupBy?.length) {
@@ -108,7 +109,7 @@ export function workforceCatalog(records: EmployeeRecord[], asOf: string) {
 export const workforceTool = {
   type: 'function',
   name: 'query_workforce',
-  description: 'Hitung atau kelompokkan data karyawan pada file dan filter aktif. Pakai untuk angka, perbandingan, rata-rata termasuk rata-rata per kelompok, komposisi, dan irisan beberapa kategori. Tidak mengembalikan identitas individu.',
+  description: 'Untuk perbandingan, sebaran, atau komposisi per kelompok selalu isi groupBy (hasilnya otomatis tampil sebagai grafik). Hitung atau kelompokkan data karyawan pada file dan filter aktif. Pakai untuk angka, perbandingan, rata-rata termasuk rata-rata per kelompok, komposisi, dan irisan beberapa kategori. Tidak mengembalikan identitas individu.',
   parameters: {
     type: 'object',
     properties: {

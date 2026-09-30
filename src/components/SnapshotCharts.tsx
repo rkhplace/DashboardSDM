@@ -128,7 +128,7 @@ export function SnapshotCharts({ records, asOf, filters, onChange, sessionId, qu
       </SectionCard>
       <section className="section-card snapshot-card workforce-ai-card" aria-label="AI Workforce Intelligence">
         <div className="workforce-ai-header"><span className="workforce-ai-mark"><Sparkles size={18}/></span><div><h2>Chatbot SDM</h2><p>Tanya tentang data periode aktif</p></div></div>
-        <ChatPanel key={`${JSON.stringify(filters)}:${query}`} sessionId={sessionId} filters={filters} query={query} count={total}/>
+        <ChatPanel sessionId={sessionId} filters={filters} query={query} count={total} onApplyFilters={onChange}/>
       </section>
     </div>
   </div>

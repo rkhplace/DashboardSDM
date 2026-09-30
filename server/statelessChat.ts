@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { filterRecords } from '../src/analytics/workforce.ts'
 import { type EmployeeRecord } from '../src/types/workforce.ts'
 import { makePrompt, presentAnswer, type Turn, validateFilters, validateSnapshot } from './app.ts'
+import { createTurnTools } from './chatExtras.ts'
 import { askGemini, ServiceError } from './gemini.ts'
 import { answerFromSession, keepQuestionLocal } from './localAnswers.ts'
 import { queryWorkforce } from './query.ts'
@@ -40,12 +41,13 @@ export async function answerStatelessChat(input: unknown, generate: Generate = a
   const privateTurn = keepQuestionLocal(message, snapshot.records)
   const previousQuestions = turns.filter(turn => turn.role === 'user').map(turn => turn.text)
   const localAnswer = privateTurn ? answerFromSession(message, records, snapshot.asOf, previousQuestions) : null
+  const tools = createTurnTools(args => queryWorkforce(args, records, snapshot.asOf), snapshot.records)
   const reply = privateTurn
     ? { answer: localAnswer?.answer ?? 'Saya belum bisa menemukan jawaban itu dari data karyawan pada hasil filter. Coba sebutkan nama, NIP, status, atau divisi yang ingin dicari.' }
-    : await generate(makePrompt(snapshot, records, message, turns), args => queryWorkforce(args, records, snapshot.asOf))
+    : await generate(makePrompt(snapshot, records, message, turns), tools.runQuery, tools.applyFilters)
   const evidence = localAnswer
     ? localAnswer.evidence.map(item => ({ ...item, period: snapshot.period }))
     : reply.evidence?.map(item => ({ ...item, period: snapshot.period })) ?? []
-  return { conversationId: input.conversationId || randomUUID(), answer: presentAnswer(reply.answer), evidence,
+  return { conversationId: input.conversationId || randomUUID(), answer: presentAnswer(reply.answer), evidence, ...tools.extras(),
     limitations: ['Jawaban mengikuti data periode dan filter aktif.'], generatedAt: new Date().toISOString() }
 }
