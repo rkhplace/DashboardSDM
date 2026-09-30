@@ -213,12 +213,15 @@ function queryWorkforce(input, records, asOf) {
   }
   return { ...base, groupBy, totalGroups: groups.size, truncated: groups.size > 60, groups: [...groups.values()].sort((a, b) => b.count - a.count).slice(0, 60).map((item) => ({ ...item, shareOfMatched: matched.length ? item.count / matched.length : 0 })) };
 }
+function promptSafe(value) {
+  return String(value).replace(new RegExp("\\p{Cc}|[<>`{}]", "gu"), " ").replace(/\s+/g, " ").trim().slice(0, 60);
+}
 function workforceCatalog(records, asOf) {
   const categorical = FIELDS.filter((field) => !numericFields.has(field));
   return {
     fields: FIELDS,
     numericFields: [...numericFields],
-    categories: Object.fromEntries(categorical.map((field) => [field, [...new Set(records.map((record) => valueOf(record, field, asOf) ?? "Tidak tersedia"))].slice(0, 80)]))
+    categories: Object.fromEntries(categorical.map((field) => [field, [...new Set(records.map((record) => promptSafe(valueOf(record, field, asOf) ?? "Tidak tersedia")))].filter(Boolean).slice(0, 80)]))
   };
 }
 var workforceTool = {
@@ -504,6 +507,41 @@ async function answerStatelessChat(input, generate = askGemini) {
 
 // server/vercelChat.ts
 var MAX_BODY2 = 4 * 1024 * 1024;
+var WINDOW_MS = 60 * 1e3;
+var MAX_REQUESTS = Math.max(1, Number(process.env.CHAT_RATE_LIMIT) || 20);
+var MAX_TRACKED_CLIENTS = 5e3;
+var hits = /* @__PURE__ */ new Map();
+function clientIp(request) {
+  const forwarded = request.headers["x-forwarded-for"];
+  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim();
+  return first || request.socket.remoteAddress || "unknown";
+}
+function rateLimited(key, now = Date.now()) {
+  if (hits.size > MAX_TRACKED_CLIENTS) {
+    for (const [client, entry2] of hits) if (entry2.resetAt <= now) hits.delete(client);
+    if (hits.size > MAX_TRACKED_CLIENTS) hits.clear();
+  }
+  const entry = hits.get(key);
+  if (!entry || entry.resetAt <= now) {
+    hits.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_REQUESTS;
+}
+function allowedOrigin(request) {
+  const origin = request.headers.origin;
+  if (!origin) return true;
+  const extra = (process.env.CHAT_ALLOWED_ORIGINS ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+  if (extra.includes(origin)) return true;
+  const forwardedHost = request.headers["x-forwarded-host"];
+  const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) ?? request.headers.host;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
 function json(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   response.end(JSON.stringify(body));
@@ -521,7 +559,12 @@ async function readBody(request) {
 }
 async function handler(request, response) {
   if (request.method !== "POST") return json(response, 405, { code: "METHOD_NOT_ALLOWED", message: "Metode tidak didukung." });
+  if (!allowedOrigin(request)) return json(response, 403, { code: "FORBIDDEN_ORIGIN", message: "Asal permintaan tidak diizinkan." });
   if (!request.headers["content-type"]?.startsWith("application/json")) return json(response, 415, { code: "CONTENT_TYPE", message: "Kirim JSON." });
+  if (rateLimited(clientIp(request))) {
+    response.setHeader("Retry-After", String(WINDOW_MS / 1e3));
+    return json(response, 429, { code: "RATE_LIMITED", message: "Terlalu banyak permintaan. Coba lagi sebentar lagi." });
+  }
   try {
     const contentLength = Number(request.headers["content-length"] ?? 0);
     if (contentLength > MAX_BODY2) return json(response, 413, { code: "REQUEST_TOO_LARGE", message: "Data melebihi batas 4 MB." });
@@ -533,10 +576,11 @@ async function handler(request, response) {
     if (error && typeof error === "object" && "status" in error && "code" in error && "message" in error && typeof error.status === "number" && typeof error.code === "string" && typeof error.message === "string") {
       return json(response, error.status, { code: error.code, message: error.message });
     }
-    console.error("Chat function failed", error);
+    console.error("Chat function failed", error instanceof Error ? error.name : typeof error);
     return json(response, 500, { code: "INTERNAL_ERROR", message: "Server mengalami kesalahan." });
   }
 }
 export {
-  handler as default
+  handler as default,
+  rateLimited
 };

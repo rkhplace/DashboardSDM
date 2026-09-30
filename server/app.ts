@@ -10,6 +10,7 @@ import { queryWorkforce, workforceCatalog } from './query.ts'
 const MAX_BODY = 4 * 1024 * 1024
 const SESSION_MS = 60 * 60 * 1000
 const MAX_RECORDS = 10000
+const MAX_SESSIONS = 50
 export type Turn = { role: 'user' | 'assistant'; text: string; private?: boolean }
 type Conversation = { turns: Turn[] }
 type Session = { snapshot: EmployeeSnapshot; expiresAt: number; conversations: Map<string, Conversation> }
@@ -102,6 +103,9 @@ export function createApp(generate: Generate = askGemini) {
       if (request.method === 'GET' && path === '/api/v1/health') return json(response, 200, { status: 'ok', aiConfigured: Boolean(process.env.GEMINI_API_KEY) })
       if (request.method === 'POST' && path === '/api/v1/sessions') {
         const snapshot = validateSnapshot(await readJson(request))
+        const now = Date.now()
+        for (const [id, item] of sessions) if (item.expiresAt <= now) sessions.delete(id)
+        if (sessions.size >= MAX_SESSIONS) throw new ServiceError(429, 'TOO_MANY_SESSIONS', 'Terlalu banyak sesi aktif. Coba lagi nanti.')
         const sessionId = randomUUID()
         sessions.set(sessionId, { snapshot, expiresAt: Date.now() + SESSION_MS, conversations: new Map() })
         return json(response, 201, { sessionId, period: snapshot.period, rowCount: snapshot.records.length, expiresInSeconds: SESSION_MS / 1000 })
