@@ -2,6 +2,8 @@ import readExcelFile from 'read-excel-file/browser'
 import type { EmployeeRecord } from '../types/workforce'
 
 export const REQUIRED_COLUMNS = ['NIP', 'NAMA', 'JABATAN', 'DIREKTORAT', 'DIVISI', 'STATUS', 'JENIS KELAMIN', 'TANGGAL LAHIR', 'TANGGAL MASUK'] as const
+export const OPTIONAL_COLUMNS = ['BAND', 'JENIS JABATAN', 'BAGIAN', 'AGAMA', 'ACTIVITY', 'FUNGSI BISNIS', 'PENDIDIKAN', 'INSTITUTE', 'JURUSAN'] as const
+const EXCEL_ERROR = /^#(?:N\/A|REF!|VALUE!|DIV\/0!|NAME\?|NUM!|NULL!|SPILL!|CALC!)$/i
 
 export interface ExcelInspection {
   sheetName: string
@@ -9,6 +11,9 @@ export interface ExcelInspection {
   headers: string[]
   rowCount: number
   missingColumns: string[]
+  missingOptionalColumns: string[]
+  /** Cells holding Excel error values such as #N/A, per column. */
+  errorCells: { column: string; count: number; nips: string[] }[]
   preview: Record<string, unknown>[]
   records: EmployeeRecord[]
 }
@@ -66,5 +71,17 @@ export async function inspectExcel(file: File): Promise<ExcelInspection> {
     positionCode: number(row, 'POSITION'), genderCode: number(row, 'JENIS KELAMIN'), genderLabel: optional(row, 'JENIS KELAMIN 1'),
     educationCode: number(row, 'PENDIDIKAN'), joinDate: dateString(row['TANGGAL MASUK']), sourceTotal: number(row, 'TOTAL'),
   }))
-  return { sheetName: sheet.sheet, period: inferPeriod(sheet.sheet, file.name), headers, rowCount: body.length, missingColumns, preview: objects.slice(0, 5), records }
+  const errors = new Map<string, { count: number; nips: string[] }>()
+  for (const row of objects) {
+    for (const header of headers) {
+      if (!header || typeof row[header] !== 'string' || !EXCEL_ERROR.test((row[header] as string).trim())) continue
+      const item = errors.get(header) ?? { count: 0, nips: [] }
+      item.count++
+      if (text(row, 'NIP')) item.nips.push(text(row, 'NIP'))
+      errors.set(header, item)
+    }
+  }
+  const errorCells = [...errors].map(([column, item]) => ({ column, ...item })).sort((a, b) => b.count - a.count)
+  const missingOptionalColumns = OPTIONAL_COLUMNS.filter(column => !headers.includes(column))
+  return { sheetName: sheet.sheet, period: inferPeriod(sheet.sheet, file.name), headers, rowCount: body.length, missingColumns, missingOptionalColumns, errorCells, preview: objects.slice(0, 5), records }
 }

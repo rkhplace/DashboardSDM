@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FileSpreadsheet, UploadCloud } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { createSession } from '../api/client'
+import { DataQualityPanel } from '../components/DataQualityPanel'
 import { inspectExcel, type ExcelInspection } from '../data/excelAdapter'
 import { useWorkforceSession } from '../data/useWorkforceSession'
 import { lastDayOfMonth, validateInspection } from '../data/validateImport'
@@ -13,21 +14,15 @@ export function ImportPage() {
   const [period, setPeriod] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const asOf = lastDayOfMonth(period)
+  const quality = useMemo(() => pending && asOf ? validateInspection(pending.inspection, asOf) : null, [pending, asOf])
 
-  async function finish(inspection: ExcelInspection, filename: string, selectedPeriod: string) {
-    const asOf = lastDayOfMonth(selectedPeriod)
-    if (!asOf) {
-      setError('Pilih bulan dan tahun periode data yang valid.')
-      return
-    }
-    const quality = validateInspection(inspection, asOf)
-    if (quality.critical.length > 0) {
-      setError(`File perlu diperbaiki: ${quality.critical.map(issue => `${issue.label} (${issue.count})`).join(', ')}.`)
-      return
-    }
+  async function finish() {
+    if (!pending || !asOf || !quality || quality.critical.length) return
     setLoading(true)
+    setError('')
     try {
-      const snapshot = { period: selectedPeriod, asOf, sourceFile: filename, records: inspection.records }
+      const snapshot = { period, asOf, sourceFile: pending.filename, records: pending.inspection.records }
       const sessionId = await createSession(snapshot)
       activate(snapshot, sessionId)
       navigate('/dashboard')
@@ -45,8 +40,8 @@ export function ImportPage() {
     setPending(null)
     try {
       const inspection = await inspectExcel(file)
-      if (inspection.period) await finish(inspection, file.name, inspection.period)
-      else setPending({ inspection, filename: file.name })
+      setPeriod(inspection.period ?? '')
+      setPending({ inspection, filename: file.name })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'File tidak dapat dibaca.')
     } finally {
@@ -54,22 +49,25 @@ export function ImportPage() {
     }
   }
 
+  function reset() { setPending(null); setPeriod(''); setError('') }
+
   return <div className="landing-page">
-    <div className="landing-content">
+    <div className={`landing-content ${pending ? 'landing-content-wide' : ''}`}>
       <div className="landing-brand"><img src="/logo-inti.png" alt="Logo PT INTI" /><span>PT INTI (Persero)</span></div>
       <h1>Dashboard SDM</h1>
-      <p className="landing-subtitle">Upload data karyawan untuk memulai</p>
-      <section className="landing-upload" aria-label="Upload file data karyawan">
-        <div className="landing-upload-icon"><FileSpreadsheet size={28} strokeWidth={1.7}/></div>
-        <h2>Upload File Data Karyawan</h2>
-        <p>Format yang didukung: <strong>.xlsx</strong></p>
-        <label className={`landing-file-button ${loading ? 'is-loading' : ''}`}>
-          <UploadCloud size={17}/>{loading ? 'Membaca file...' : 'Pilih File'}
-          <input type="file" accept=".xlsx" disabled={loading} onChange={event => { void upload(event.target.files?.[0]); event.target.value = '' }} />
-        </label>
-        {pending && <div className="landing-period"><p>Periode tidak ditemukan pada nama sheet atau file. Pilih bulan data untuk melanjutkan.</p><div><input aria-label="Periode data" type="month" value={period} onChange={event => setPeriod(event.target.value)} /><button type="button" disabled={!period || loading} onClick={() => { void finish(pending.inspection, pending.filename, period) }}>Lanjut ke dashboard</button></div></div>}
-        {error && <p className="landing-error" role="alert">{error}</p>}
-      </section>
+      <p className="landing-subtitle">{pending ? 'Periksa hasil pembacaan file sebelum masuk dashboard' : 'Upload data karyawan untuk memulai'}</p>
+      {pending
+        ? <DataQualityPanel inspection={pending.inspection} filename={pending.filename} period={period} onPeriodChange={setPeriod} quality={quality} loading={loading} onContinue={() => { void finish() }} onReset={reset}/>
+        : <section className="landing-upload" aria-label="Upload file data karyawan">
+          <div className="landing-upload-icon"><FileSpreadsheet size={28} strokeWidth={1.7}/></div>
+          <h2>Upload File Data Karyawan</h2>
+          <p>Format yang didukung: <strong>.xlsx</strong></p>
+          <label className={`landing-file-button ${loading ? 'is-loading' : ''}`}>
+            <UploadCloud size={17}/>{loading ? 'Membaca file...' : 'Pilih File'}
+            <input type="file" accept=".xlsx" disabled={loading} onChange={event => { void upload(event.target.files?.[0]); event.target.value = '' }} />
+          </label>
+        </section>}
+      {error && <p className="landing-error" role="alert">{error}</p>}
       <p className="landing-footnote">File dibaca di browser; data sesi dipakai chatbot saat bertanya dan hilang saat halaman ditutup.</p>
     </div>
   </div>

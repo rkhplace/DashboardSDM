@@ -6,6 +6,7 @@ import '@fontsource/poppins/latin-600.css'
 import '@fontsource/poppins/latin-700.css'
 import '@fontsource/poppins/latin-800.css'
 import './index.css'
+import './features.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
