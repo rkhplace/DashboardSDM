@@ -29,8 +29,14 @@ function validQuery(input: unknown): QuerySpec | null {
   if (value.field !== undefined && !validField(value.field)) return null
   if (value.operation === 'average' && (!validField(value.field) || !numericFields.has(value.field))) return null
   if (value.groupBy !== undefined && (!Array.isArray(value.groupBy) || value.groupBy.length > 2 || value.groupBy.some(field => !validField(field)))) return null
-  if (value.filters !== undefined && (!Array.isArray(value.filters) || value.filters.length > 6)) return null
-  for (const filter of (value.filters ?? []) as unknown[]) {
+  if (value.filters !== undefined && !validFilters(value.filters)) return null
+  return value as QuerySpec
+}
+
+/** Validates a filter list shared by query_workforce and list_employees. */
+export function validFilters(input: unknown): Filter[] | null {
+  if (!Array.isArray(input) || input.length > 6) return null
+  for (const filter of input as unknown[]) {
     if (!filter || typeof filter !== 'object' || Array.isArray(filter)) return null
     const item = filter as Record<string, unknown>
     if (!validField(item.field) || !['eq', 'contains', 'gte', 'lte', 'between'].includes(String(item.operator))) return null
@@ -39,7 +45,11 @@ function validQuery(input: unknown): QuerySpec | null {
     if (item.operator === 'between' && (typeof item.min !== 'number' || typeof item.max !== 'number' || item.min > item.max)) return null
     if (['gte', 'lte'].includes(String(item.operator)) && typeof item.min !== 'number' && typeof item.max !== 'number') return null
   }
-  return value as QuerySpec
+  return input as Filter[]
+}
+
+export function matchesFilters(record: EmployeeRecord, filters: Filter[], asOf: string): boolean {
+  return filters.every(filter => matches(record, filter, asOf))
 }
 
 function matches(record: EmployeeRecord, filter: Filter, asOf: string): boolean {
@@ -56,7 +66,7 @@ function matches(record: EmployeeRecord, filter: Filter, asOf: string): boolean 
 export function queryWorkforce(input: unknown, records: EmployeeRecord[], asOf: string) {
   const query = validQuery(input)
   if (!query) return { error: 'Parameter query tidak valid. Gunakan field dan operator dari deklarasi alat.' }
-  const matched = records.filter(record => (query.filters ?? []).every(filter => matches(record, filter, asOf)))
+  const matched = records.filter(record => matchesFilters(record, query.filters ?? [], asOf))
   const base = { operation: query.operation, population: records.length, matched: matched.length, shareOfPopulation: records.length ? matched.length / records.length : 0, filters: query.filters ?? [] }
   // count + groupBy is treated as a distribution so the breakdown (and chart) is not lost.
   if (query.operation === 'count' && !query.groupBy?.length) return base
