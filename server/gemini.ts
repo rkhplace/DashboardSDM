@@ -19,7 +19,12 @@ export async function askGemini(prompt: string, runQuery?: (arguments_: unknown)
       signal: AbortSignal.timeout(25000),
     })
     if (!response.ok) {
+      // Log Google's own error (status + reason) server-side only; it never contains the API key.
+      const detail = (await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 600)
+      console.error(`[gemini] HTTP ${response.status} (model ${model}): ${detail}`)
       if (response.status === 429) throw new ServiceError(429, 'AI_RATE_LIMIT', 'Batas penggunaan Gemini tercapai. Coba lagi nanti.')
+      if (response.status === 400 || response.status === 401 || response.status === 403) throw new ServiceError(502, 'AI_REJECTED', 'Gemini menolak permintaan. Periksa GEMINI_API_KEY dan GEMINI_MODEL di backend.')
+      if (response.status === 404) throw new ServiceError(502, 'AI_MODEL_NOT_FOUND', `Model Gemini "${model}" tidak ditemukan. Periksa GEMINI_MODEL di backend.`)
       throw new ServiceError(502, 'AI_UNAVAILABLE', 'Gemini tidak dapat menjawab saat ini.')
     }
     const result = await response.json() as { steps?: Step[] }
