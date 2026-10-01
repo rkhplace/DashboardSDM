@@ -383,7 +383,11 @@ async function askGemini(prompt, runQuery, applyFilters) {
       signal: AbortSignal.timeout(25e3)
     });
     if (!response.ok) {
+      const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 600);
+      console.error(`[gemini] HTTP ${response.status} (model ${model}): ${detail}`);
       if (response.status === 429) throw new ServiceError(429, "AI_RATE_LIMIT", "Batas penggunaan Gemini tercapai. Coba lagi nanti.");
+      if (response.status === 400 || response.status === 401 || response.status === 403) throw new ServiceError(502, "AI_REJECTED", "Gemini menolak permintaan. Periksa GEMINI_API_KEY dan GEMINI_MODEL di backend.");
+      if (response.status === 404) throw new ServiceError(502, "AI_MODEL_NOT_FOUND", `Model Gemini "${model}" tidak ditemukan. Periksa GEMINI_MODEL di backend.`);
       throw new ServiceError(502, "AI_UNAVAILABLE", "Gemini tidak dapat menjawab saat ini.");
     }
     const result = await response.json();
