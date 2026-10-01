@@ -12,10 +12,10 @@ describe('Vercel stateless chat', () => {
     const reply = await answerStatelessChat({ snapshot, message: 'Bandingkan rata-rata usia per divisi.', history: [
       { role: 'user', text: `Bagaimana data ${snapshot.records[0].name}?` },
       { role: 'assistant', text: `${snapshot.records[0].name} bekerja di ${snapshot.records[0].division}.` },
-    ] }, async (text, runQuery, applyFilters) => {
+    ] }, async (text, tools) => {
       prompt = text
-      const result = runQuery?.({ operation: 'average', field: 'age', groupBy: ['division'] }) as { totalGroups: number }
-      applyFilters?.({ status: ['Aktif'] })
+      const result = tools?.runQuery?.({ operation: 'average', field: 'age', groupBy: ['division'] }) as { totalGroups: number }
+      tools?.applyFilters?.({ status: ['Aktif'] })
       return { answer: `Ada ${result.totalGroups} divisi untuk dibandingkan.` }
     })
     expect(reply.answer).toContain('10 divisi')
@@ -30,9 +30,9 @@ describe('Vercel stateless chat', () => {
     const snapshot = getPrototypeSnapshot()
     let prompt = ''
     let toolOutput = ''
-    const reply = await answerStatelessChat({ snapshot, message: 'Siapa saja nama karyawan berusia di atas 50 tahun?' }, async (text, _runQuery, _applyFilters, listEmployees) => {
+    const reply = await answerStatelessChat({ snapshot, message: 'Siapa saja nama karyawan berusia di atas 50 tahun?' }, async (text, tools) => {
       prompt = text
-      const listed = listEmployees?.({ filters: [{ field: 'age', operator: 'gte', min: 51 }] }) as { matched: number; rows: { ref: string }[] }
+      const listed = tools?.listEmployees?.({ filters: [{ field: 'age', operator: 'gte', min: 51 }] }) as { matched: number; rows: { ref: string }[] }
       toolOutput = JSON.stringify(listed)
       return { answer: `Ada ${listed.matched} karyawan: ${listed.rows.map(row => row.ref).join(', ')}.` }
     })

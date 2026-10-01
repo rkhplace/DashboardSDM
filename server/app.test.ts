@@ -6,13 +6,13 @@ import { createApp, presentAnswer } from './app'
 describe('AI session API', () => {
   it('sends aggregate questions to AI with a query tool scoped to the active file and filter', async () => {
     const prompts: string[] = []
-    const server = createApp(async (prompt, runQuery, _applyFilters, listEmployees) => {
+    const server = createApp(async (prompt, tools) => {
       prompts.push(prompt)
       if (prompt.includes('PERTANYAAN BARU: Bagaimana data KARYAWAN_1?')) {
-        const listed = listEmployees?.({ refs: ['KARYAWAN_1'] }) as { rows: { ref: string; division: string }[] }
+        const listed = tools?.listEmployees?.({ refs: ['KARYAWAN_1'] }) as { rows: { ref: string; division: string }[] }
         return { answer: `${listed.rows[0].ref} bekerja di ${listed.rows[0].division}.` }
       }
-      const result = runQuery?.({ operation: 'average', field: 'age', filters: [{ field: 'status', operator: 'eq', value: 'Staf Komisaris' }] }) as { average: number; matched: number }
+      const result = tools?.runQuery?.({ operation: 'average', field: 'age', filters: [{ field: 'status', operator: 'eq', value: 'Staf Komisaris' }] }) as { average: number; matched: number }
       return { answer: `Rata-rata usia ${result.matched} staf komisaris adalah ${result.average} tahun.`, evidence: [{ metric: 'averageAge', value: result.average }] }
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))

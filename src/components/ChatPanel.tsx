@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Filter, Send } from 'lucide-react'
 import { sendChat } from '../api/client'
 import { describeFilters } from '../analytics/filters'
+import type { RetirementSettings } from '../analytics/retirement'
 import { useWorkforceSession } from '../data/useWorkforceSession'
 import type { ChatChart, WorkforceFilters } from '../types/workforce'
 import { ChatChartView } from './ChatChartView'
@@ -12,9 +13,9 @@ type Message =
   | { role: 'assistant'; text: string; charts?: ChatChart[]; suggestedFilters?: WorkforceFilters | null; applied?: boolean }
   | { role: 'note'; text: string }
 
-type Props = { sessionId: string; filters: WorkforceFilters; query: string; count: number; onApplyFilters: (filters: WorkforceFilters) => void }
+type Props = { sessionId: string; filters: WorkforceFilters; query: string; count: number; retirement?: RetirementSettings; onApplyFilters: (filters: WorkforceFilters) => void }
 
-export function ChatPanel({ sessionId, filters, query, count, onApplyFilters }: Props) {
+export function ChatPanel({ sessionId, filters, query, count, retirement, onApplyFilters }: Props) {
   const { snapshot } = useWorkforceSession()
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string>()
@@ -47,7 +48,7 @@ export function ChatPanel({ sessionId, filters, query, count, onApplyFilters }: 
     const history = messages.filter((item): item is Extract<Message, { role: 'user' | 'assistant' }> => item.role !== 'note').map(item => ({ role: item.role, text: item.text }))
     setMessages(current => [...current, { role: 'user' as const, text: message }].slice(-100))
     try {
-      const reply = await sendChat(sessionId, snapshot!, message, filters, query, history, conversationId)
+      const reply = await sendChat(sessionId, snapshot!, message, filters, query, history, conversationId, retirement)
       setConversationId(reply.conversationId)
       setMessages(current => [...current, { role: 'assistant' as const, text: reply.answer, charts: reply.charts, suggestedFilters: reply.suggestedFilters }].slice(-100))
     } catch (cause) {

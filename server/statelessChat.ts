@@ -4,6 +4,7 @@ import { makePrompt, presentAnswer, type Turn, validateFilters, validateSnapshot
 import { createTurnTools } from './chatExtras.ts'
 import { askGemini, ServiceError } from './gemini.ts'
 import { IdentityMap, listEmployees } from './identity.ts'
+import { runRetirementProjection, validateRetirementSettings } from './retirementTool.ts'
 import { queryWorkforce } from './query.ts'
 
 type Generate = typeof askGemini
@@ -34,9 +35,11 @@ export async function answerStatelessChat(input: unknown, generate: Generate = a
   const records = search ? filtered.filter(record => `${record.nip} ${record.name} ${record.position} ${record.directorate} ${record.division} ${record.section} ${record.status} ${record.activity ?? ''}`.toLocaleLowerCase('id').includes(search)) : filtered
   const message = input.message.trim()
   const identities = new IdentityMap()
-  const tools = createTurnTools(args => queryWorkforce(args, records, snapshot.asOf), snapshot.records, args => listEmployees(args, records, snapshot.asOf, identities))
+  const retirement = validateRetirementSettings(input.retirement, snapshot.records)
+  const tools = createTurnTools(args => queryWorkforce(args, records, snapshot.asOf), snapshot.records, args => listEmployees(args, records, snapshot.asOf, identities),
+    args => runRetirementProjection(args, records, snapshot.asOf, retirement, identities))
   const history = turns.map(turn => ({ ...turn, text: identities.redact(turn.text, snapshot.records) }))
-  const reply = await generate(makePrompt(snapshot, records, identities.redact(message, snapshot.records), history), tools.runQuery, tools.applyFilters, tools.listEmployees)
+  const reply = await generate(makePrompt(snapshot, records, identities.redact(message, snapshot.records), history, retirement), tools)
   const evidence = reply.evidence?.map(item => ({ ...item, period: snapshot.period })) ?? []
   return { conversationId: input.conversationId || randomUUID(), answer: identities.restore(presentAnswer(reply.answer)), evidence, ...tools.extras(),
     limitations: ['Jawaban mengikuti data periode dan filter aktif.'], generatedAt: new Date().toISOString() }
