@@ -1,3 +1,4 @@
+import type { RetirementSettings } from '../analytics/retirement'
 import type { ChatChart, EmployeeSnapshot, WorkforceFilters } from '../types/workforce'
 
 async function api<T>(path: string, init: RequestInit): Promise<T> {
@@ -34,9 +35,9 @@ export interface ChatReply {
   suggestedFilters?: WorkforceFilters | null
 }
 
-export function sendChat(sessionId: string, snapshot: EmployeeSnapshot, message: string, filters: WorkforceFilters, query: string, history: { role: 'user' | 'assistant'; text: string }[], conversationId?: string): Promise<ChatReply> {
+export function sendChat(sessionId: string, snapshot: EmployeeSnapshot, message: string, filters: WorkforceFilters, query: string, history: { role: 'user' | 'assistant'; text: string }[], conversationId?: string, retirement?: RetirementSettings): Promise<ChatReply> {
   if (import.meta.env.PROD) {
-    return api<ChatReply>('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snapshot, message, filters, query, history: history.slice(-8), conversationId }) })
+    return api<ChatReply>('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snapshot, message, filters, query, history: history.slice(-8), conversationId, retirement }) })
   }
-  return api<ChatReply>(`/api/v1/sessions/${sessionId}/ai/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, filters, query, conversationId }) })
+  return api<ChatReply>(`/api/v1/sessions/${sessionId}/ai/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, filters, query, conversationId, retirement }) })
 }

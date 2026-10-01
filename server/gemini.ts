@@ -1,22 +1,37 @@
 import { filterTool } from './chatExtras.ts'
 import { listTool } from './identity.ts'
 import { workforceTool } from './query.ts'
+import { retirementTool } from './retirementTool.ts'
 
 export interface GeminiReply { answer: string; evidence?: { metric: string; value: number }[] }
 
 type Step = { type?: string; name?: string; id?: string; arguments?: unknown; content?: { type?: string; text?: string }[] }
 
-export async function askGemini(prompt: string, runQuery?: (arguments_: unknown) => unknown, applyFilters?: (arguments_: unknown) => unknown, listEmployees?: (arguments_: unknown) => unknown): Promise<GeminiReply> {
+type Runner = (arguments_: unknown) => unknown
+/** Tool runners for one chat turn; only the ones provided are offered to the model. */
+export interface TurnTools { runQuery?: Runner; applyFilters?: Runner; listEmployees?: Runner; projectRetirement?: Runner }
+const TOOLS = [
+  { name: 'query_workforce', definition: workforceTool, runner: 'runQuery' },
+  { name: 'set_dashboard_filters', definition: filterTool, runner: 'applyFilters' },
+  { name: 'list_employees', definition: listTool, runner: 'listEmployees' },
+  { name: 'project_retirement', definition: retirementTool, runner: 'projectRetirement' },
+] as const
+const MAX_ROUNDS = 5
+
+export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<GeminiReply> {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new ServiceError(503, 'AI_NOT_CONFIGURED', 'GEMINI_API_KEY belum diatur pada backend.')
   const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
   const history: unknown[] = [{ type: 'user_input', content: [{ type: 'text', text: prompt }] }]
   const evidence: { metric: string; value: number }[] = []
-  for (let round = 0; round < 3; round++) {
+  const offered = TOOLS.filter(tool => tools[tool.runner])
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    // The last round goes out without tools so the model must answer with what it already gathered.
+    const finalRound = round === MAX_ROUNDS - 1
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({ model, store: false, input: history, ...(runQuery ? { tools: [workforceTool, ...(applyFilters ? [filterTool] : []), ...(listEmployees ? [listTool] : [])] } : {}) }),
+      body: JSON.stringify({ model, store: false, input: history, ...(offered.length && !finalRound ? { tools: offered.map(tool => tool.definition) } : {}) }),
       signal: AbortSignal.timeout(25000),
     })
     if (!response.ok) {
@@ -32,12 +47,11 @@ export async function askGemini(prompt: string, runQuery?: (arguments_: unknown)
     const steps = result.steps ?? []
     history.push(...steps)
     const calls = steps.filter(step => step.type === 'function_call')
-    if (calls.length && runQuery) {
-      if (calls.length > 6) throw new ServiceError(502, 'AI_TOOL_LIMIT', 'Analisis membutuhkan terlalu banyak perhitungan sekaligus. Coba pertanyaan yang lebih spesifik.')
+    if (calls.length && offered.length) {
+      if (calls.length > 8) throw new ServiceError(502, 'AI_TOOL_LIMIT', 'Analisis membutuhkan terlalu banyak perhitungan sekaligus. Coba pertanyaan yang lebih spesifik.')
       for (const call of calls) {
-        const output = call.name === 'query_workforce' ? runQuery(call.arguments)
-          : call.name === 'set_dashboard_filters' && applyFilters ? applyFilters(call.arguments)
-            : call.name === 'list_employees' && listEmployees ? listEmployees(call.arguments) : { error: 'Alat tidak dikenal.' }
+        const runner = offered.find(tool => tool.name === call.name)?.runner
+        const output = runner ? tools[runner]!(call.arguments) : { error: 'Alat tidak dikenal.' }
         if (output && typeof output === 'object' && !Array.isArray(output)) {
           const data = output as Record<string, unknown>
           const metric = typeof data.operation === 'string' ? data.operation : 'query'

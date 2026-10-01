@@ -1,6 +1,7 @@
 import { useState, type MouseEvent } from 'react'
 import { Sparkles } from 'lucide-react'
 import { AGE_GROUPS, TENURE_GROUPS, ageGroup, countBy, educationOf, fullYears, genderOf, tenureGroup } from '../analytics/workforce'
+import type { RetirementSettings } from '../analytics/retirement'
 import type { EmployeeRecord, Gender, WorkforceFilters } from '../types/workforce'
 import { SectionCard } from './SectionCard'
 import { ChatPanel } from './ChatPanel'
@@ -12,6 +13,7 @@ type Props = {
   onChange: (filters: WorkforceFilters) => void
   sessionId: string
   query: string
+  retirement?: RetirementSettings
 }
 
 type Segment = { key: string; value: number; color: string }
@@ -69,7 +71,7 @@ function Pyramid({ rows, label, selected, onSelect }: { rows: PyramidRow[]; labe
   </div>)}</>
 }
 
-export function SnapshotCharts({ records, asOf, filters, onChange, sessionId, query }: Props) {
+export function SnapshotCharts({ records, asOf, filters, onChange, sessionId, query, retirement }: Props) {
   const [showAllDivisions, setShowAllDivisions] = useState(false)
   const [hoveredSliceIndex, setHoveredSliceIndex] = useState<number | null>(null)
   const total = records.length
@@ -183,7 +185,7 @@ export function SnapshotCharts({ records, asOf, filters, onChange, sessionId, qu
       </SectionCard>
       <section className="section-card snapshot-card workforce-ai-card" aria-label="AI Workforce Intelligence">
         <div className="workforce-ai-header"><span className="workforce-ai-mark"><Sparkles size={18}/></span><div><h2>Chatbot SDM</h2><p>Tanya tentang data periode aktif</p></div></div>
-        <ChatPanel sessionId={sessionId} filters={filters} query={query} count={total} onApplyFilters={onChange}/>
+        <ChatPanel sessionId={sessionId} filters={filters} query={query} count={total} retirement={retirement} onApplyFilters={onChange}/>
       </section>
     </div>
   </div>
