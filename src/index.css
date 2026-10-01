@@ -308,21 +308,21 @@ body:has(.dashboard-page){background:#faf9ff}
 .dashboard-page .kpi-figure strong,.dashboard-page .status-item strong{font-weight:400}
 .dashboard-page .kpi-figure>span{font-weight:500}
 
-/* Gender, age, and a compact activity story. */
+/* Snapshot top row (gender, age, tenure) and the business-function pie styles. */
 .dashboard-page .snapshot-top{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr)}
-.dashboard-page .activity-card{display:flex;flex-direction:column}
-.dashboard-page .activity-visual{position:relative;display:grid;place-items:center;padding:8px 0 16px}
-.dashboard-page .activity-pie{width:160px;aspect-ratio:1;border-radius:50%;cursor:crosshair;box-shadow:0 0 0 1px #e6eaf2}
-.dashboard-page .activity-tooltip{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);max-width:180px;padding:8px 10px;border:1px solid #dbe2ef;border-radius:7px;background:#fff;box-shadow:0 8px 20px #14204924;text-align:center;pointer-events:none}
-.dashboard-page .activity-tooltip strong{display:block;color:#14254b;font-size:11px;font-weight:600;white-space:nowrap}
-.dashboard-page .activity-tooltip span{display:block;margin-top:2px;color:#576881;font-size:10px;white-space:nowrap}
-.dashboard-page .activity-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;min-width:0;margin:auto 0 0}
-.dashboard-page .activity-legend-item{display:flex;align-items:center;gap:7px;min-width:0;min-height:18px;color:#20304e;font-size:10px;line-height:1.3}
-.dashboard-page .activity-swatch{width:9px;height:9px;flex:none;border-radius:2px}
-.dashboard-page .activity-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:1450px){.dashboard-page .activity-pie{width:142px}.dashboard-page .activity-legend{grid-template-columns:1fr;gap:5px}}
-@media(max-width:1180px){.dashboard-page .snapshot-top{grid-template-columns:minmax(220px,.8fr) minmax(0,1.6fr)}.dashboard-page .snapshot-top .activity-card{grid-column:1/-1}.dashboard-page .activity-legend{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:720px){.dashboard-page .snapshot-top{grid-template-columns:1fr}.dashboard-page .snapshot-top .activity-card{grid-column:auto}.dashboard-page .activity-legend{grid-template-columns:1fr}}
+.dashboard-page .function-card{display:flex;flex-direction:column}
+.dashboard-page .function-visual{position:relative;display:grid;place-items:center;padding:8px 0 16px}
+.dashboard-page .function-pie{width:160px;aspect-ratio:1;border-radius:50%;cursor:crosshair;box-shadow:0 0 0 1px #e6eaf2}
+.dashboard-page .function-tooltip{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);max-width:180px;padding:8px 10px;border:1px solid #dbe2ef;border-radius:7px;background:#fff;box-shadow:0 8px 20px #14204924;text-align:center;pointer-events:none}
+.dashboard-page .function-tooltip strong{display:block;color:#14254b;font-size:11px;font-weight:600;white-space:nowrap}
+.dashboard-page .function-tooltip span{display:block;margin-top:2px;color:#576881;font-size:10px;white-space:nowrap}
+.dashboard-page .function-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;min-width:0;margin:auto 0 0}
+.dashboard-page .function-legend-item{display:flex;align-items:center;gap:7px;min-width:0;min-height:18px;color:#20304e;font-size:10px;line-height:1.3}
+.dashboard-page .function-swatch{width:9px;height:9px;flex:none;border-radius:2px}
+.dashboard-page .function-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:1450px){.dashboard-page .function-pie{width:142px}.dashboard-page .function-legend{grid-template-columns:1fr;gap:5px}}
+@media(max-width:1180px){.dashboard-page .snapshot-top{grid-template-columns:minmax(220px,.8fr) minmax(0,1.6fr)}.dashboard-page .snapshot-top .tenure-card{grid-column:1/-1}.dashboard-page .function-legend{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.dashboard-page .snapshot-top{grid-template-columns:1fr}.dashboard-page .snapshot-top .tenure-card{grid-column:auto}.dashboard-page .function-legend{grid-template-columns:1fr}}
 
 /* Matching matrix and directory panels with independent table scrolling. */
 .dashboard-page .matrix-section,.dashboard-page .employee-section{height:clamp(500px,72vh,620px);display:flex;flex-direction:column;overflow:hidden}
@@ -425,3 +425,30 @@ body:has(.dashboard-page){background:#faf9ff}
 @media(max-width:1180px){.dashboard-page .snapshot-bottom{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.dashboard-page .snapshot-bottom{grid-template-columns:1fr}.dashboard-page .workforce-ai-card{height:500px;max-height:500px}.filter-dropdown-popover{width:min(300px,90vw)}}
 @media(max-width:650px){.dashboard-title-row{gap:8px}.dashboard-title-row img{width:64px;height:38px}.dashboard-title-row .dashboard-period{white-space:normal}.dashboard-page .page-heading h1{font-size:23px}}
+
+/* Stacked bars (pendidikan per gender, divisi per pendidikan) and tenure pyramid. */
+.stacked-fill{height:100%;display:flex;border-radius:5px;overflow:hidden}
+.stacked-fill i{height:100%;display:block;flex:none}
+.stacked-bars .tenure-top>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-key{row-gap:6px}
+.tenure-pyramid .age-group-label{font-size:10px;overflow:hidden;text-overflow:ellipsis}
+.dashboard-page .function-legend-item small{margin-left:auto;flex:none;color:#687385;font-size:9px}
+
+/* Bottom row: charts fill the card height so every card ends level with its neighbours. */
+.dashboard-page .snapshot-bottom>.snapshot-card:not(.workforce-ai-card){display:flex;flex-direction:column}
+.dashboard-page .snapshot-bottom .stacked-bars{flex:1 1 auto;min-height:0;gap:2px}
+.dashboard-page .snapshot-bottom .stacked-bars .tenure-row{flex:1 1 0;max-height:52px;min-height:30px;display:flex;flex-direction:column;justify-content:center}
+.dashboard-page .snapshot-bottom .stacked-bars .tenure-top{width:100%}
+.dashboard-page .snapshot-bottom .stacked-bars .tenure-track{width:100%;height:8px}
+.dashboard-page .snapshot-bottom .chart-more{flex:none;align-self:flex-start}
+.dashboard-page .snapshot-bottom .chart-key{flex:none;margin-top:auto;padding-top:12px;column-gap:9px;border-top:1px solid #eef1f5}
+.dashboard-page .snapshot-bottom .education-key{column-gap:7px;font-size:9.5px}
+.dashboard-page .snapshot-bottom .education-key span{gap:4px}
+/* Fungsi bisnis pie now sits in the bottom row: centre a larger pie, legend at the bottom. */
+.dashboard-page .snapshot-bottom .function-visual{flex:1 1 auto;align-content:center;padding:4px 0 14px}
+.dashboard-page .snapshot-bottom .function-pie{width:min(200px,100%)}
+.dashboard-page .snapshot-bottom .function-legend{flex:none;padding-top:12px;border-top:1px solid #eef1f5}
+/* Top row: age and tenure pyramids share the same width and styling; footnotes sit on the card floor. */
+@media(min-width:1181px){.dashboard-page .snapshot-top{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) minmax(0,1.5fr)}}
+.dashboard-page .snapshot-top .age-card,.dashboard-page .snapshot-top .tenure-card{display:flex;flex-direction:column}
+.dashboard-page .snapshot-top .age-card .chart-footnote,.dashboard-page .snapshot-top .tenure-card .chart-footnote{margin-top:auto;padding-top:16px}

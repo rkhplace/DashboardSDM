@@ -128,3 +128,9 @@
 .retirement-scope button{display:inline-flex;align-items:center;gap:6px;border:1px solid #173b68;background:#173b68;color:#fff;border-radius:4px;padding:6px 11px;font-size:12px;font-weight:600;white-space:nowrap}
 .retirement-scope button:hover{background:#254f7f}
 .link-button.is-selected{display:inline-flex;align-items:center;gap:4px;background:#e3edf8;border-radius:3px;padding:1px 5px;text-decoration:none}
+
+/* Legacy ".employee-filter-bar label{display:block}" (from the old <select> filters) also hit the dropdown's
+   search <label>, stacking the icon above the input. Restore the inline layout everywhere. */
+.filter-dropdown-popover label.filter-dropdown-search{display:flex;align-items:center;gap:6px;height:32px;min-width:0}
+.filter-dropdown-popover label.filter-dropdown-search svg{flex:none}
+.filter-dropdown-popover label.filter-dropdown-search input{flex:1;height:100%;padding:0}
