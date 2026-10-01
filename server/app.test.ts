@@ -6,8 +6,12 @@ import { createApp, presentAnswer } from './app'
 describe('AI session API', () => {
   it('sends aggregate questions to AI with a query tool scoped to the active file and filter', async () => {
     const prompts: string[] = []
-    const server = createApp(async (prompt, runQuery) => {
+    const server = createApp(async (prompt, runQuery, _applyFilters, listEmployees) => {
       prompts.push(prompt)
+      if (prompt.includes('PERTANYAAN BARU: Bagaimana data KARYAWAN_1?')) {
+        const listed = listEmployees?.({ refs: ['KARYAWAN_1'] }) as { rows: { ref: string; division: string }[] }
+        return { answer: `${listed.rows[0].ref} bekerja di ${listed.rows[0].division}.` }
+      }
       const result = runQuery?.({ operation: 'average', field: 'age', filters: [{ field: 'status', operator: 'eq', value: 'Staf Komisaris' }] }) as { average: number; matched: number }
       return { answer: `Rata-rata usia ${result.matched} staf komisaris adalah ${result.average} tahun.`, evidence: [{ metric: 'averageAge', value: result.average }] }
     })
@@ -38,17 +42,19 @@ describe('AI session API', () => {
       const personal = await post(`/sessions/${sessionId}/ai/chat`, { message: `Bagaimana data ${snapshot.records[0].name}?` })
       expect(personal.status).toBe(200)
       const personalReply = await personal.json() as { answer: string; conversationId: string }
-      expect(personalReply.answer).toContain(snapshot.records[0].name)
-      expect(prompts).toHaveLength(2)
+      expect(personalReply.answer).toBe(`${snapshot.records[0].name} bekerja di ${snapshot.records[0].division}.`)
+      expect(prompts).toHaveLength(3)
+      expect(prompts[2]).not.toContain(snapshot.records[0].name)
 
       const followup = await post(`/sessions/${sessionId}/ai/chat`, { conversationId: reply.conversationId, message: 'Bagaimana dibandingkan dengan semua karyawan?' })
       expect(followup.status).toBe(200)
-      expect(prompts[2]).toContain('Rata-rata usia 4 staf komisaris')
+      expect(prompts[3]).toContain('Rata-rata usia 4 staf komisaris')
 
       const afterPersonal = await post(`/sessions/${sessionId}/ai/chat`, { conversationId: personalReply.conversationId, message: 'Jelaskan sebaran status.' })
       expect(afterPersonal.status).toBe(200)
-      expect(prompts[3]).not.toContain(snapshot.records[0].name)
-      expect(prompts[3]).not.toContain(snapshot.records[0].nip)
+      expect(prompts[4]).toContain('KARYAWAN_1 bekerja di')
+      expect(prompts[4]).not.toContain(snapshot.records[0].name)
+      expect(prompts[4]).not.toContain(snapshot.records[0].nip)
 
       const deleted = await fetch(`${base}/sessions/${sessionId}`, { method: 'DELETE' })
       expect(deleted.status).toBe(204)

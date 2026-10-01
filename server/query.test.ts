@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getPrototypeSnapshot } from '../src/data/repository'
 import { queryWorkforce, workforceCatalog } from './query'
-import { keepQuestionLocal } from './localAnswers'
 
 describe('queryWorkforce', () => {
   it('calculates combinations and averages from the uploaded records', () => {
@@ -28,10 +27,4 @@ describe('queryWorkforce', () => {
     expect(queryWorkforce({ operation: 'count', filters: [{ field: 'name', operator: 'eq', value: 'A' }] }, records, snapshot.asOf)).toHaveProperty('error')
   })
 
-  it('allows analytical questions phrased with siapa while keeping employee names local', () => {
-    const records = getPrototypeSnapshot().records
-    expect(keepQuestionLocal('Siapa divisi dengan rata-rata usia tertinggi?', records)).toBe(false)
-    expect(keepQuestionLocal('Siapa saja karyawan berstatus Aktif?', records)).toBe(true)
-    expect(keepQuestionLocal(`Bagaimana data ${records[0].name}?`, records)).toBe(true)
-  })
 })

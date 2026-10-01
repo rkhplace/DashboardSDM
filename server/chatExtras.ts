@@ -93,7 +93,7 @@ export function resolveFilterSuggestion(input: unknown, records: EmployeeRecord[
 }
 
 /** Tool runners for one chat turn; they record charts and filter suggestions for the response. */
-export function createTurnTools(runQuery: (args: unknown) => unknown, allRecords: EmployeeRecord[]) {
+export function createTurnTools(runQuery: (args: unknown) => unknown, allRecords: EmployeeRecord[], runList?: (args: unknown) => unknown) {
   const charts: ChatChart[] = []
   let suggestedFilters: WorkforceFilters | null = null
   return {
@@ -108,6 +108,7 @@ export function createTurnTools(runQuery: (args: unknown) => unknown, allRecords
       if ('filters' in result && result.filters) suggestedFilters = result.filters
       return result
     },
+    listEmployees: runList,
     extras() { return { charts: charts.slice(-MAX_CHARTS), suggestedFilters } },
   }
 }
