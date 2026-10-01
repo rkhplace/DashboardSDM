@@ -610,28 +610,42 @@ var TOOLS = [
   { name: "project_retirement", definition: retirementTool, runner: "projectRetirement" }
 ];
 var MAX_ROUNDS = 5;
+var RETRYABLE = /* @__PURE__ */ new Set([500, 502, 503, 504]);
 async function askGemini(prompt, tools = {}) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new ServiceError(503, "AI_NOT_CONFIGURED", "GEMINI_API_KEY belum diatur pada backend.");
-  const model = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+  let model = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
   const history = [{ type: "user_input", content: [{ type: "text", text: prompt }] }];
   const evidence = [];
   const offered = TOOLS.filter((tool) => tools[tool.runner]);
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const finalRound = round === MAX_ROUNDS - 1;
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    const send = (useModel) => fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ model, store: false, input: history, ...offered.length && !finalRound ? { tools: offered.map((tool) => tool.definition) } : {} }),
+      body: JSON.stringify({ model: useModel, store: false, input: history, ...offered.length && !finalRound ? { tools: offered.map((tool) => tool.definition) } : {} }),
       signal: AbortSignal.timeout(25e3)
     });
+    let response = await send(model);
+    if (RETRYABLE.has(response.status)) {
+      console.error(`[gemini] HTTP ${response.status} (model ${model}), retrying once: ${(await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 300)}`);
+      await new Promise((resolve) => setTimeout(resolve, Number(process.env.GEMINI_RETRY_DELAY_MS ?? 1e3)));
+      response = await send(model);
+    }
+    const fallback = process.env.GEMINI_FALLBACK_MODEL?.trim();
+    if (RETRYABLE.has(response.status) && fallback && fallback !== model) {
+      console.error(`[gemini] HTTP ${response.status} (model ${model}) again, switching to fallback ${fallback}`);
+      model = fallback;
+      response = await send(model);
+    }
     if (!response.ok) {
       const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 600);
       console.error(`[gemini] HTTP ${response.status} (model ${model}): ${detail}`);
       if (response.status === 429) throw new ServiceError(429, "AI_RATE_LIMIT", "Batas penggunaan Gemini tercapai. Coba lagi nanti.");
       if (response.status === 400 || response.status === 401 || response.status === 403) throw new ServiceError(502, "AI_REJECTED", "Gemini menolak permintaan. Periksa GEMINI_API_KEY dan GEMINI_MODEL di backend.");
       if (response.status === 404) throw new ServiceError(502, "AI_MODEL_NOT_FOUND", `Model Gemini "${model}" tidak ditemukan. Periksa GEMINI_MODEL di backend.`);
-      throw new ServiceError(502, "AI_UNAVAILABLE", "Gemini tidak dapat menjawab saat ini.");
+      if (RETRYABLE.has(response.status)) throw new ServiceError(503, "AI_BUSY", `Layanan Gemini sedang sibuk (kode ${response.status}). Coba lagi beberapa saat.`);
+      throw new ServiceError(502, "AI_UNAVAILABLE", `Gemini tidak dapat menjawab saat ini (kode ${response.status}).`);
     }
     const result = await response.json();
     const steps = result.steps ?? [];
