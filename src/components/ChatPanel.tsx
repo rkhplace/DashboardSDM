@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Filter, Send } from 'lucide-react'
+import { FileText, Filter, Send } from 'lucide-react'
 import { sendChat } from '../api/client'
+import { monthLabel } from '../analytics/contracts'
 import { describeFilters } from '../analytics/filters'
 import type { RetirementSettings } from '../analytics/retirement'
 import { useWorkforceSession } from '../data/useWorkforceSession'
@@ -13,10 +14,10 @@ type Message =
   | { role: 'assistant'; text: string; charts?: ChatChart[]; suggestedFilters?: WorkforceFilters | null; applied?: boolean }
   | { role: 'note'; text: string }
 
-type Props = { sessionId: string; filters: WorkforceFilters; query: string; count: number; retirement?: RetirementSettings; onApplyFilters: (filters: WorkforceFilters) => void }
+type Props = { sessionId: string; filters: WorkforceFilters; query: string; count: number; retirement?: RetirementSettings; contractMonths?: number; compareWith?: string; onApplyFilters: (filters: WorkforceFilters) => void }
 
-export function ChatPanel({ sessionId, filters, query, count, retirement, onApplyFilters }: Props) {
-  const { snapshot } = useWorkforceSession()
+export function ChatPanel({ sessionId, filters, query, count, retirement, contractMonths, compareWith, onApplyFilters }: Props) {
+  const { snapshot, history: savedPeriods } = useWorkforceSession()
   const [input, setInput] = useState('')
   const [conversationId, setConversationId] = useState<string>()
   const [messages, setMessages] = useState<Message[]>([])
@@ -43,12 +44,24 @@ export function ChatPanel({ sessionId, filters, query, count, retirement, onAppl
     const message = input.trim()
     if (!message || busy) return
     setInput('')
+    await ask(message)
+  }
+
+  // The summary is written by the AI from its own tool calls; this only phrases the request.
+  function requestSummary() {
+    if (busy || !snapshot) return
+    const earlier = savedPeriods.filter(item => item.period < snapshot.period).map(item => item.period)
+    const against = compareWith && earlier.includes(compareWith) ? compareWith : earlier[earlier.length - 1]
+    void ask(`Buatkan ringkasan periode ${monthLabel(snapshot.period)}${against ? ` dibanding ${monthLabel(against)}` : ''} untuk laporan bulanan SDM.`)
+  }
+
+  async function ask(message: string) {
     setError('')
     setBusy(true)
     const history = messages.filter((item): item is Extract<Message, { role: 'user' | 'assistant' }> => item.role !== 'note').map(item => ({ role: item.role, text: item.text }))
     setMessages(current => [...current, { role: 'user' as const, text: message }].slice(-100))
     try {
-      const reply = await sendChat(sessionId, snapshot!, message, filters, query, history, conversationId, retirement)
+      const reply = await sendChat(sessionId, snapshot!, message, filters, query, history, conversationId, retirement, { contractMonths, compareWith, periods: savedPeriods.filter(item => item.period !== snapshot!.period) })
       setConversationId(reply.conversationId)
       setMessages(current => [...current, { role: 'assistant' as const, text: reply.answer, charts: reply.charts, suggestedFilters: reply.suggestedFilters }].slice(-100))
     } catch (cause) {
@@ -80,6 +93,7 @@ export function ChatPanel({ sessionId, filters, query, count, retirement, onAppl
       {busy && <p className="workforce-chat-placeholder">AI sedang menjawab...</p>}
     </div>
     {error && <p className="workforce-chat-error" role="alert">{error}</p>}
+    <div className="workforce-chat-actions"><button type="button" onClick={requestSummary} disabled={busy}><FileText size={13}/>Ringkasan periode ini</button></div>
     <form onSubmit={event => { void submit(event) }} className="workforce-chat-form">
       <input aria-label="Pertanyaan untuk chatbot" value={input} onChange={event => setInput(event.target.value)} maxLength={500} placeholder="Tanya data atau istilah SDM..." disabled={busy}/>
       <button type="submit" aria-label="Kirim pertanyaan" disabled={busy || !input.trim()}><Send size={14}/></button>

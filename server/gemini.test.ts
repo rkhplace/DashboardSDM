@@ -1,5 +1,5 @@
-import { afterEach, expect, it, vi } from 'vitest'
-import { askGemini } from './gemini'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { askGemini, toolSafe } from './gemini'
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 process.env.GEMINI_RETRY_DELAY_MS = '0'
@@ -53,4 +53,33 @@ it('switches to GEMINI_FALLBACK_MODEL when the main model stays overloaded', asy
   }))
   expect((await askGemini('tanya')).answer).toBe('Dari cadangan.')
   expect(models).toEqual(['gemini-3.1-flash-lite', 'gemini-3.1-flash-lite', 'backup-model'])
+})
+
+describe('tool output sanitising', () => {
+  it('strips control characters and caps long text from the Excel file', () => {
+    const long = 'A'.repeat(500)
+    const result = toolSafe({ unit: 'DIV\u0000 A\nB', nested: [{ note: long }], count: 3, flag: null }) as { unit: string; nested: { note: string }[]; count: number; flag: null }
+    expect(result.unit).toBe('DIV A B')
+    expect(result.nested[0].note.length).toBe(201)
+    expect(result.count).toBe(3)
+    expect(result.flag).toBeNull()
+  })
+})
+
+it('reports a failing tool to Gemini instead of failing the whole answer', async () => {
+  vi.stubEnv('GEMINI_API_KEY', 'test-key')
+  vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  const results: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body)) as { input: { type: string; result?: { text: string }[] }[] }
+    const result = body.input.find(step => step.type === 'function_result')
+    if (result) results.push(result.result![0].text)
+    const steps = result
+      ? [{ type: 'model_output', content: [{ type: 'text', text: 'Angkanya belum tersedia.' }] }]
+      : [{ type: 'function_call', name: 'query_workforce', id: 'c1', arguments: { operation: 'count' } }]
+    return new Response(JSON.stringify({ steps }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }))
+  const reply = await askGemini('tanya', { runQuery: () => { throw new Error('bug') } })
+  expect(reply.answer).toBe('Angkanya belum tersedia.')
+  expect(results[0]).toContain('gagal dijalankan')
 })

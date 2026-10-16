@@ -26,6 +26,8 @@ export interface EmployeeRecord {
   educationCode: number | null
   joinDate: string | null
   sourceTotal: number | null
+  /** End date of a fixed-term (PKWT) contract, ISO yyyy-mm-dd. Absent in snapshots saved before the column existed. */
+  contractEnd?: string | null
 }
 
 export interface EmployeeSnapshot {

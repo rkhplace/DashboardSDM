@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { ArrowLeft, Hourglass, X } from 'lucide-react'
 import { RETIREMENT_AGE_OPTIONS, type RetirementProjection, type RetirementSettings } from '../analytics/retirement'
 import { FilterDropdown } from './FilterDropdown'
+import { RangeSlider } from './RangeSlider'
+import { formatDate } from '../analytics/format'
 
 type Props = {
   projection: RetirementProjection
@@ -13,9 +15,10 @@ type Props = {
   onClearDivisions: () => void
 }
 
-const HORIZON_OPTIONS = ['1', '2', '3', '4', '5']
+/** Same bounds as the chatbot's project_retirement tool (server/retirementTool.ts). */
+const HORIZON_MIN = 1
+const HORIZON_MAX = 30
 const number = (value: number) => value.toLocaleString('id-ID')
-const formatDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const formatMonthsLeft = (months: number, overdue: boolean) => overdue ? 'Lewat usia' : months < 12 ? `${months} bln` : `${Math.floor(months / 12)} th ${months % 12} bln`
 
 export function RetirementPanel({ projection, settings, statusOptions, onSettingsChange, selectedDivisions, onSelectDivision, onClearDivisions }: Props) {
@@ -29,7 +32,7 @@ export function RetirementPanel({ projection, settings, statusOptions, onSetting
       <div className="retirement-title"><Hourglass size={17}/><div><h2>Proyeksi pensiun &amp; risiko suksesi</h2><p>Dihitung dari tanggal lahir pada hasil filter</p></div></div>
       <div className="retirement-controls">
         <div><span>Usia pensiun</span><FilterDropdown label="Usia pensiun" allowAll={false} options={RETIREMENT_AGE_OPTIONS.map(String)} selected={[String(settings.age)]} display={value => `${value} tahun`} onChange={([value]) => value && onSettingsChange({ ...settings, age: Number(value) })}/></div>
-        <div><span>Rentang</span><FilterDropdown label="Rentang proyeksi" allowAll={false} options={HORIZON_OPTIONS} selected={[String(settings.horizonYears)]} display={value => `${value} tahun ke depan`} onChange={([value]) => value && onSettingsChange({ ...settings, horizonYears: Number(value) })}/></div>
+        <RangeSlider label="Rentang proyeksi" value={settings.horizonYears} min={HORIZON_MIN} max={HORIZON_MAX} ticks={[1, 5, 10, 15, 20, 25, 30]} valueLabel={years => `${years} tahun`} stepName="tahun" onChange={horizonYears => onSettingsChange({ ...settings, horizonYears })}/>
         <div><span>Status dihitung</span><FilterDropdown label="Status dihitung" options={statusOptions} selected={settings.statuses} multiple onChange={statuses => onSettingsChange({ ...settings, statuses })}/></div>
       </div>
     </div>
@@ -49,12 +52,12 @@ export function RetirementPanel({ projection, settings, statusOptions, onSetting
         <div className="retirement-body">
           <div className="retirement-windows">
             <h3>Jumlah pensiun per 12 bulan</h3>
-            {projection.windows.map(window => <div className="retirement-window" key={window.label}>
+            <div className="retirement-window-list" tabIndex={projection.windows.length > 10 ? 0 : undefined} aria-label="Jumlah pensiun per 12 bulan">{projection.windows.map(window => <div className="retirement-window" key={window.label}>
               <span className="retirement-window-label">{window.label}</span>
               <span className="retirement-window-track"><span style={{ width: `${window.count / maxWindow * 100}%` }}/></span>
               <strong>{number(window.count)}</strong>
               {window.keyCount > 0 && <small>{number(window.keyCount)} struktural</small>}
-            </div>)}
+            </div>)}</div>
           </div>
           <div className="retirement-divisions">
             <h3>Risiko per divisi</h3>

@@ -93,7 +93,11 @@ export function resolveFilterSuggestion(input: unknown, records: EmployeeRecord[
 }
 
 /** Tool runners for one chat turn; they record charts and filter suggestions for the response. */
-export function createTurnTools(runQuery: (args: unknown) => unknown, allRecords: EmployeeRecord[], runList?: (args: unknown) => unknown, runRetirement?: (args: unknown) => unknown) {
+type Runner = (args: unknown) => unknown
+/** Extra read-only tools offered when their data is available. */
+export interface ExtraRunners { projectContracts?: Runner; queryTrends?: Runner; checkDataQuality?: Runner }
+
+export function createTurnTools(runQuery: Runner, allRecords: EmployeeRecord[], runList?: Runner, runRetirement?: Runner, extra: ExtraRunners = {}) {
   const charts: ChatChart[] = []
   let suggestedFilters: WorkforceFilters | null = null
   return {
@@ -110,6 +114,7 @@ export function createTurnTools(runQuery: (args: unknown) => unknown, allRecords
     },
     listEmployees: runList,
     projectRetirement: runRetirement,
+    ...extra,
     extras() { return { charts: charts.slice(-MAX_CHARTS), suggestedFilters } },
   }
 }

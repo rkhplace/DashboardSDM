@@ -1,7 +1,7 @@
 import type { EmployeeRecord } from '../types/workforce'
 
 export const DEFAULT_RETIREMENT_AGE = 56
-export const RETIREMENT_AGE_OPTIONS = [55, 56, 57, 58, 60] as const
+export const RETIREMENT_AGE_OPTIONS = [55, 56, 57, 58, 59, 60] as const
 /** Contract, board and CLTP statuses do not follow normal-age retirement, so they are excluded by default. */
 const NON_RETIRING_STATUS = /pkwt|direksi|komisaris|cltp/i
 

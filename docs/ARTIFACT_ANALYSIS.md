@@ -1,6 +1,6 @@
 # Analisis artefak dan rencana implementasi
 
-> Pembaruan alur, September 2026: aplikasi kini selalu dimulai dari landing page sederhana dengan logo PT INTI dan kotak upload. Snapshot dummy tidak otomatis tampil. Periode diambil dari nama sheet atau file; bila tidak ditemukan, pengguna memilih bulan pada kotak upload. Setelah file valid, satu halaman dashboard terbuka dengan filter, KPI, grafik komposisi, matriks, dan daftar karyawan. Sidebar dan halaman placeholder dihapus. Grafik tren historis tidak ditampilkan karena data lintas periode belum tersedia. Uraian visual Stitch di bawah tetap merupakan analisis referensi awal, bukan spesifikasi UI terkini.
+> Pembaruan alur, September 2026: aplikasi kini selalu dimulai dari landing page sederhana dengan logo PT INTI dan kotak upload. Snapshot dummy tidak otomatis tampil. Periode diambil dari nama sheet atau file; bila tidak ditemukan, pengguna memilih bulan pada kotak upload. Setelah file valid, satu halaman dashboard terbuka dengan filter, KPI, grafik komposisi, matriks, dan daftar karyawan. Sidebar dan halaman placeholder dihapus. Sejak Oktober 2026 setiap file disimpan sebagai satu periode (bulan) di browser, dan dashboard menampilkan tren lintas periode (jumlah karyawan, masuk/keluar, turnover, mutasi, ganti NIP). Uraian visual Stitch di bawah tetap merupakan analisis referensi awal, bukan spesifikasi UI terkini.
 
 ## A. Artefak
 
@@ -46,9 +46,9 @@ Pemeriksaan kualitas awal: NIP duplikat 0, nama kosong 0, divisi kosong 0, statu
 
 ## D. Arsitektur dan struktur folder
 
-Frontend React/TypeScript strict + Vite + React Router + Tailwind dan CSS token. `src/data` berisi adapter Excel, validasi awal, dan state sesi tanpa penyimpanan otomatis. `src/analytics` berisi fungsi murni untuk filter dan agregasi. `src/components` berisi UI reusable. `src/pages` berisi layar. `src/types` menampung Employee/Snapshot/ImportBatch. `src/ai` menyiapkan kontrak hasil agregat tanpa mengirim PII. `scripts` mengonversi workbook lokal menjadi fixture test. API FastAPI/PostgreSQL akan mengganti state sesi saat data lintas periode tersedia; TanStack Query ditambahkan saat ada backend.
+Frontend React/TypeScript strict + Vite + React Router + Tailwind dan CSS token. `src/data` berisi adapter Excel, validasi awal, state sesi, dan penyimpanan periode di IndexedDB (`snapshotStore.ts`, bisa diganti adapter Portal HC). `src/analytics` berisi fungsi murni untuk filter dan agregasi. `src/components` berisi UI reusable. `src/pages` berisi layar. `src/types` menampung Employee/Snapshot/ImportBatch. `src/ai` menyiapkan kontrak hasil agregat tanpa mengirim PII. `scripts` mengonversi workbook lokal menjadi fixture test. API FastAPI/PostgreSQL akan mengganti state sesi saat data lintas periode tersedia; TanStack Query ditambahkan saat ada backend.
 
-Model konseptual: `Employee` (NIP, nama, lahir, gender, pendidikan), `EmployeeSnapshot` (employeeId, period, organisasi, posisi, band, status, activity), `ImportBatch` (nama file, periode, waktu, jumlah baris, hasil validasi). Satu workbook sekarang menghasilkan satu snapshot.
+Model konseptual: `Employee` (NIP, nama, lahir, gender, pendidikan), `EmployeeSnapshot` (employeeId, period, organisasi, posisi, band, status, activity), `ImportBatch` (nama file, periode, waktu, jumlah baris, hasil validasi). Satu workbook menghasilkan satu snapshot per periode; beberapa workbook bisa diunggah sekaligus untuk banyak periode.
 
 ## E. Peta halaman dan komponen
 

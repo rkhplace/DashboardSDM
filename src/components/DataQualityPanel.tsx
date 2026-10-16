@@ -2,6 +2,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Download, FileSpreadsheet, Rot
 import type { ExcelInspection } from '../data/excelAdapter'
 import { qualityCsv, type ImportIssue, type ImportQuality } from '../data/validateImport'
 import { downloadCsv } from '../report/download'
+import type { ImportNote } from '../data/importChecks'
 
 type Props = {
   inspection: ExcelInspection
@@ -10,13 +11,15 @@ type Props = {
   onPeriodChange: (period: string) => void
   quality: ImportQuality | null
   loading: boolean
+  /** Where the file will be stored: replacement, future period, conflicting names, identical content. */
+  notes?: ImportNote[]
   onContinue: () => void
   onReset: () => void
 }
 
 const number = (value: number) => value.toLocaleString('id-ID')
 
-function IssueList({ items, tone }: { items: ImportIssue[]; tone: 'critical' | 'warning' }) {
+export function IssueList({ items, tone }: { items: ImportIssue[]; tone: 'critical' | 'warning' }) {
   return <ul className={`dq-list dq-${tone}`}>{items.map(item => <li key={item.label}>
     <div className="dq-item-top">{tone === 'critical' ? <XCircle size={15}/> : <AlertTriangle size={15}/>}<span>{item.label}</span><strong>{number(item.count)}</strong></div>
     {item.hint && <p>{item.hint}</p>}
@@ -24,7 +27,7 @@ function IssueList({ items, tone }: { items: ImportIssue[]; tone: 'critical' | '
   </li>)}</ul>
 }
 
-export function DataQualityPanel({ inspection, filename, period, onPeriodChange, quality, loading, onContinue, onReset }: Props) {
+export function DataQualityPanel({ inspection, filename, period, onPeriodChange, quality, loading, notes = [], onContinue, onReset }: Props) {
   const critical = quality?.critical ?? []
   const warnings = quality?.warnings ?? []
   const affected = new Set(warnings.flatMap(item => item.nips ?? [])).size
@@ -46,6 +49,7 @@ export function DataQualityPanel({ inspection, filename, period, onPeriodChange,
       <label><span>Periode data</span><input type="month" value={period} onChange={event => onPeriodChange(event.target.value)} aria-label="Periode data"/></label>
     </div>
     {!inspection.period && <p className="dq-note">Periode tidak ditemukan di nama sheet atau file. Pilih bulan data secara manual.</p>}
+    {notes.map(note => <p key={note.text} className={`dq-note ${note.tone === 'info' ? 'is-info' : ''}`}>{note.text}</p>)}
     <p className={`dq-status dq-status-${status.tone}`} role="status"><status.icon size={16}/>{status.text}</p>
     {critical.length > 0 && <><h3>Masalah kritis</h3><IssueList items={critical} tone="critical"/></>}
     {warnings.length > 0 && <><h3>Catatan kualitas</h3><IssueList items={warnings} tone="warning"/></>}

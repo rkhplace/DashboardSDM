@@ -355,39 +355,48 @@ body:has(.dashboard-page){background:#faf9ff}
 .dashboard-page .employee-section .employee-table{width:100%;min-width:0;table-layout:fixed;font-size:10.5px}
 .dashboard-page .employee-section .employee-table th,.dashboard-page .employee-section .employee-table td{min-width:0;padding:8px 6px;line-height:1.4;overflow-wrap:break-word;vertical-align:top}
 .dashboard-page .employee-section .employee-table th{font-size:9px;white-space:normal}
-.dashboard-page .employee-section .employee-table th:nth-child(1){width:6.5%}
-.dashboard-page .employee-section .employee-table th:nth-child(2){width:9.5%}
-.dashboard-page .employee-section .employee-table th:nth-child(3){width:3.5%}
-.dashboard-page .employee-section .employee-table th:nth-child(4){width:13%}
-.dashboard-page .employee-section .employee-table th:nth-child(5){width:12%}
-.dashboard-page .employee-section .employee-table th:nth-child(6){width:11%}
-.dashboard-page .employee-section .employee-table th:nth-child(7){width:11%}
-.dashboard-page .employee-section .employee-table th:nth-child(8){width:7%}
-.dashboard-page .employee-section .employee-table th:nth-child(9){width:4.5%}
-.dashboard-page .employee-section .employee-table th:nth-child(10){width:3.5%}
-.dashboard-page .employee-section .employee-table th:nth-child(11){width:5.5%}
-.dashboard-page .employee-section .employee-table th:nth-child(12){width:5.5%}
-.dashboard-page .employee-section .employee-table th:nth-child(13){width:7.5%}
-.dashboard-page .employee-section .employee-table td:nth-child(3),.dashboard-page .employee-section .employee-table td:nth-child(9),.dashboard-page .employee-section .employee-table td:nth-child(10),.dashboard-page .employee-section .employee-table td:nth-child(11){text-align:center}
+/* Columns are addressed by class, not position, so an optional column (Selesai kontrak) cannot shift the layout. */
+.dashboard-page .employee-section .employee-table .col-nip{width:6.5%}
+.dashboard-page .employee-section .employee-table .col-name{width:9.5%}
+.dashboard-page .employee-section .employee-table .col-band{width:3.5%}
+.dashboard-page .employee-section .employee-table .col-position{width:13%}
+.dashboard-page .employee-section .employee-table .col-directorate{width:12%}
+.dashboard-page .employee-section .employee-table .col-division{width:11%}
+.dashboard-page .employee-section .employee-table .col-section{width:11%}
+.dashboard-page .employee-section .employee-table .col-status{width:7%}
+.dashboard-page .employee-section .employee-table .col-contract{width:6%}
+.dashboard-page .employee-section .employee-table .col-gender{width:4.5%}
+.dashboard-page .employee-section .employee-table .col-age{width:3.5%}
+.dashboard-page .employee-section .employee-table .col-tenure{width:5.5%}
+.dashboard-page .employee-section .employee-table .col-education{width:5.5%}
+.dashboard-page .employee-section .employee-table .col-activity{width:7.5%}
+.dashboard-page .employee-section .employee-table.has-contract :is(.col-position,.col-directorate){width:11%}
+.dashboard-page .employee-section .employee-table.has-contract :is(.col-division,.col-section){width:9.5%}
+.dashboard-page .employee-section .employee-table :is(td.col-band,td.col-gender,td.col-age,td.col-tenure){text-align:center}
 .dashboard-page .employee-section .nip-cell{font-size:9px;overflow-wrap:anywhere}
 @media(max-width:1450px){
   .dashboard-page .employee-section .employee-table{font-size:11px}
   .dashboard-page .employee-section .employee-table th{font-size:10px}
-  .dashboard-page .employee-section .employee-table :is(th,td):is(:nth-child(3),:nth-child(5),:nth-child(7),:nth-child(9),:nth-child(11),:nth-child(12)){display:none}
-  .dashboard-page .employee-section .employee-table th:nth-child(1){width:12%}
-  .dashboard-page .employee-section .employee-table th:nth-child(2){width:18%}
-  .dashboard-page .employee-section .employee-table th:nth-child(4){width:22%}
-  .dashboard-page .employee-section .employee-table th:nth-child(6){width:19%}
-  .dashboard-page .employee-section .employee-table th:nth-child(8){width:12%}
-  .dashboard-page .employee-section .employee-table th:nth-child(10){width:6%}
-  .dashboard-page .employee-section .employee-table th:nth-child(13){width:11%}
+  .dashboard-page .employee-section .employee-table :is(.col-band,.col-directorate,.col-section,.col-gender,.col-tenure,.col-education){display:none}
+  .dashboard-page .employee-section .employee-table .col-nip{width:12%}
+  .dashboard-page .employee-section .employee-table .col-name{width:18%}
+  .dashboard-page .employee-section .employee-table .col-position{width:22%}
+  .dashboard-page .employee-section .employee-table .col-division{width:19%}
+  .dashboard-page .employee-section .employee-table .col-status{width:12%}
+  .dashboard-page .employee-section .employee-table .col-contract{width:10%}
+  .dashboard-page .employee-section .employee-table .col-age{width:6%}
+  .dashboard-page .employee-section .employee-table .col-activity{width:11%}
+  .dashboard-page .employee-section .employee-table.has-contract .col-name{width:16%}
+  .dashboard-page .employee-section .employee-table.has-contract .col-position{width:18%}
+  .dashboard-page .employee-section .employee-table.has-contract .col-division{width:17%}
+  .dashboard-page .employee-section .employee-table.has-contract .col-activity{width:9%}
 }
 @media(max-width:700px){
-  .dashboard-page .employee-section .employee-table :is(th,td):is(:nth-child(4),:nth-child(10),:nth-child(13)){display:none}
-  .dashboard-page .employee-section .employee-table th:nth-child(1){width:24%}
-  .dashboard-page .employee-section .employee-table th:nth-child(2){width:26%}
-  .dashboard-page .employee-section .employee-table th:nth-child(6){width:30%}
-  .dashboard-page .employee-section .employee-table th:nth-child(8){width:20%}
+  .dashboard-page .employee-section .employee-table :is(.col-position,.col-contract,.col-age,.col-activity){display:none}
+  .dashboard-page .employee-section .employee-table .col-nip,.dashboard-page .employee-section .employee-table.has-contract .col-nip{width:24%}
+  .dashboard-page .employee-section .employee-table .col-name,.dashboard-page .employee-section .employee-table.has-contract .col-name{width:26%}
+  .dashboard-page .employee-section .employee-table .col-division,.dashboard-page .employee-section .employee-table.has-contract .col-division{width:30%}
+  .dashboard-page .employee-section .employee-table .col-status{width:20%}
 }
 @media print{.dashboard-page .employee-section{height:auto}.dashboard-page .employee-section .table-scroll{overflow:visible}.dashboard-page .employee-section .employee-table :is(th,td){display:table-cell!important}}
 

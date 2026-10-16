@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { acceptedContentType, MAX_BODY, parseBody, readStream } from './body.ts'
 import { answerStatelessChat } from './statelessChat.ts'
 
-const MAX_BODY = 4 * 1024 * 1024
 const WINDOW_MS = 60 * 1000
 const MAX_REQUESTS = Math.max(1, Number(process.env.CHAT_RATE_LIMIT) || 20)
 const MAX_TRACKED_CLIENTS = 5000
@@ -29,7 +29,8 @@ export function rateLimited(key: string, now = Date.now()): boolean {
 
 function allowedOrigin(request: IncomingMessage): boolean {
   const origin = request.headers.origin
-  if (!origin) return true
+  // Browsers always send Origin on a POST; a request without one is a script, not the dashboard.
+  if (!origin) return false
   const extra = (process.env.CHAT_ALLOWED_ORIGINS ?? '').split(',').map(item => item.trim()).filter(Boolean)
   if (extra.includes(origin)) return true
   const forwardedHost = request.headers['x-forwarded-host']
@@ -42,22 +43,19 @@ function json(response: ServerResponse, status: number, body: unknown) {
   response.end(JSON.stringify(body))
 }
 
+/** Vercel may have read the body already: an object for JSON, a Buffer (or string) for compressed bytes. */
 async function readBody(request: RequestWithBody): Promise<unknown> {
-  if (request.body !== undefined) return request.body
-  const chunks: Buffer[] = []
-  let size = 0
-  for await (const chunk of request) {
-    size += chunk.length
-    if (size > MAX_BODY) throw Object.assign(new Error('Data melebihi batas 4 MB.'), { status: 413, code: 'REQUEST_TOO_LARGE' })
-    chunks.push(chunk)
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
+  const parsed = request.body
+  if (Buffer.isBuffer(parsed)) return parseBody(parsed)
+  if (typeof parsed === 'string') return parseBody(Buffer.from(parsed, 'utf8'))
+  if (parsed !== undefined && parsed !== null) return parsed
+  return parseBody(await readStream(request))
 }
 
 export default async function handler(request: RequestWithBody, response: ServerResponse) {
   if (request.method !== 'POST') return json(response, 405, { code: 'METHOD_NOT_ALLOWED', message: 'Metode tidak didukung.' })
   if (!allowedOrigin(request)) return json(response, 403, { code: 'FORBIDDEN_ORIGIN', message: 'Asal permintaan tidak diizinkan.' })
-  if (!request.headers['content-type']?.startsWith('application/json')) return json(response, 415, { code: 'CONTENT_TYPE', message: 'Kirim JSON.' })
+  if (!acceptedContentType(request.headers['content-type'])) return json(response, 415, { code: 'CONTENT_TYPE', message: 'Kirim JSON.' })
   if (rateLimited(clientIp(request))) {
     response.setHeader('Retry-After', String(WINDOW_MS / 1000))
     return json(response, 429, { code: 'RATE_LIMITED', message: 'Terlalu banyak permintaan. Coba lagi sebentar lagi.' })
@@ -69,6 +67,8 @@ export default async function handler(request: RequestWithBody, response: Server
     return json(response, 200, await answerStatelessChat(body))
   } catch (error) {
     if (error instanceof SyntaxError) return json(response, 400, { code: 'INVALID_JSON', message: 'JSON tidak valid.' })
+    // Vercel's own body parser reports bad JSON with statusCode instead of status.
+    if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 400) return json(response, 400, { code: 'INVALID_JSON', message: 'JSON tidak valid.' })
     if (error instanceof Error && error.name === 'TimeoutError') return json(response, 504, { code: 'AI_TIMEOUT', message: 'Gemini terlalu lama merespons.' })
     if (error && typeof error === 'object' && 'status' in error && 'code' in error && 'message' in error
       && typeof error.status === 'number' && typeof error.code === 'string' && typeof error.message === 'string') {
