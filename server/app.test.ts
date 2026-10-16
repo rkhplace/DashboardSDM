@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib'
 import { type AddressInfo } from 'node:net'
 import { describe, expect, it } from 'vitest'
 import { getPrototypeSnapshot } from '../src/data/repository'
@@ -21,7 +22,8 @@ describe('AI session API', () => {
     const post = (path: string, body: unknown) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     try {
       const snapshot = getPrototypeSnapshot()
-      const created = await post('/sessions', snapshot)
+      // The browser compresses large bodies; the local API must read them like the Vercel function does.
+      const created = await fetch(`${base}/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'Content-Encoding': 'gzip' }, body: gzipSync(JSON.stringify(snapshot)) })
       expect(created.status).toBe(201)
       const { sessionId } = await created.json() as { sessionId: string }
       const first = await post(`/sessions/${sessionId}/ai/chat`, { message: 'Rata-rata umur staf komisaris berapa?' })

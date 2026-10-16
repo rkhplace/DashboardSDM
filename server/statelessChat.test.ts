@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -57,8 +58,10 @@ describe('Vercel stateless chat', () => {
       const snapshot = getPrototypeSnapshot()
       const key = process.env.GEMINI_API_KEY
       delete process.env.GEMINI_API_KEY
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot, message: `Bagaimana data ${snapshot.records[0].name}?` }) })
+      const origin = new URL(url).origin
+      // The browser sends large bodies gzip-compressed as raw bytes; the route must read them the same way.
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'Content-Encoding': 'gzip', Origin: origin },
+        body: gzipSync(JSON.stringify({ snapshot, message: `Bagaimana data ${snapshot.records[0].name}?` })) })
       if (key) process.env.GEMINI_API_KEY = key
       // Every question now goes to the AI; without a key the route reports that instead of a canned answer.
       expect(response.status).toBe(503)
@@ -75,6 +78,9 @@ describe('Vercel stateless chat', () => {
     try {
       const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: '{}' })
       expect(response.status).toBe(403)
+      // Scripts that send no Origin at all are not the dashboard either.
+      const anonymous = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      expect(anonymous.status).toBe(403)
     } finally {
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
     }

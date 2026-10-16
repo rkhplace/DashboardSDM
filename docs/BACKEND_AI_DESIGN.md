@@ -4,9 +4,9 @@ Status: prototipe lokal telah diimplementasikan. Keputusan pengguna: data hanya 
 
 ## Kondisi aplikasi saat ini
 
-Alur aktif adalah `ImportPage` → `inspectExcel` → `validateInspection` → `POST /sessions` → state `WorkforceSessionProvider` → `DashboardPage`. Excel dibaca di browser, lalu snapshot dikirim sebagai JSON ke backend lokal dan ditahan dalam memori selama maksimal satu jam. Setelah refresh, state browser hilang sehingga pengguna perlu upload ulang. `src/data/repository.ts` hanya mengakses fixture dummy untuk test, bukan database. Belum ada autentikasi atau audit. Chatbot memanggil Gemini bila `GEMINI_API_KEY` tersedia.
+Alur aktif adalah `ImportPage` → `inspectExcel` → `validateInspection` → `POST /sessions` → state `WorkforceSessionProvider` → `DashboardPage`. Excel dibaca di browser, lalu snapshot dikirim sebagai JSON ke backend lokal dan ditahan dalam memori selama maksimal satu jam. Snapshot setiap periode juga disimpan di IndexedDB browser (`src/data/snapshotStore.ts`) untuk analisis antar-periode di dashboard; setelah refresh, periode terakhir dibuka kembali dan sesi backend dibuat ulang. Chatbot tetap hanya menerima data periode aktif. `src/data/repository.ts` hanya mengakses fixture dummy untuk test, bukan database. Belum ada autentikasi atau audit. Chatbot memanggil Gemini bila `GEMINI_API_KEY` tersedia.
 
-Aturan hitung yang sudah ada di `src/analytics/workforce.ts` perlu menjadi kontrak bersama: headcount memakai NIP unik; status aktif berarti label persis `Aktif`; usia dan masa kerja dihitung terhadap tanggal akhir periode; gender dan pendidikan tidak dikenal tetap punya kategori sendiri. Snapshot lintas periode, tren, retensi, dan prediksi belum bisa dihitung dari satu workbook.
+Aturan hitung yang sudah ada di `src/analytics/workforce.ts` perlu menjadi kontrak bersama: headcount memakai NIP unik; status aktif berarti label persis `Aktif`; usia dan masa kerja dihitung terhadap tanggal akhir periode; gender dan pendidikan tidak dikenal tetap punya kategori sendiri. Tren lintas periode (headcount, masuk/keluar, turnover, mutasi) dihitung di browser dari snapshot yang tersimpan; prediksi belum tersedia. Turnover = karyawan non-PKWT yang keluar ÷ rata-rata karyawan non-PKWT dua periode; semua PKWT yang keluar tidak dihitung (arahan HC, Oktober 2026); kontrak yang jatuh tempo dilacak tindak lanjutnya: diperpanjang, diangkat tetap, selesai, atau belum ada keputusan.
 
 ## Batas tanggung jawab
 
@@ -47,7 +47,7 @@ Contoh respons:
   "conversationId": "id-acak-per-sesi",
   "answer": "...",
   "evidence": [{ "metric": "total", "value": 42, "period": "2026-07" }],
-  "limitations": ["Data hanya mencakup satu snapshot; perubahan dari bulan sebelumnya tidak tersedia."],
+  "limitations": ["Jawaban mengikuti data periode dan filter aktif."],
   "generatedAt": "2026-09-25T00:00:00Z"
 }
 ```
@@ -62,9 +62,21 @@ Nilai pada contoh respons adalah ilustrasi kontrak, bukan hasil workbook. Backen
 - Chatbot menjawab pertanyaan nama, NIP, status, divisi, dan pendidikan yang tersedia di sesi langsung dari backend lokal. Pertanyaan dan jawaban yang memuat identitas tidak masuk ke riwayat yang dikirim ke Gemini. Penilaian kinerja atau tingkat keaktifan seperti “sangat baik” tidak disimpulkan jika kolomnya tidak tersedia.
 - Panel chat berada di kartu AI dashboard. Mengubah filter atau pencarian memulai percakapan baru agar jawaban lama tidak tercampur dengan konteks data baru.
 
+### Alat AI untuk data multi-periode
+
+Gemini memutuskan sendiri alat mana yang dipanggil; semua jawaban dan ringkasan ditulis model dari hasil alat, tanpa teks template. Angka dihitung backend dengan fungsi yang sama dengan panel dashboard sehingga hasilnya identik.
+
+| Alat | Isi | Sumber hitung |
+|---|---|---|
+| `query_trends` | `series` (karyawan, aktif, PKWT, masuk, keluar, PKWT keluar, turnover per periode) dan `compare` (perpindahan antara dua periode, tindak lanjut kontrak jatuh tempo, rincian per divisi/direktorat/status, daftar karyawan) | `src/analytics/trends.ts` |
+| `project_contracts` | Kontrak PKWT berakhir per bulan dan divisi, kontrak lewat tanggal, daftar karyawan; rentang mengikuti panel (maks 48 bulan) | `src/analytics/contracts.ts` |
+| `check_data_quality` | Temuan pemeriksaan data, termasuk kolom MASKER yang tidak cocok dengan tanggal masuk dan karyawan masuk yang perlu dicek | `src/data/validateImport.ts`, `trends.ts` |
+
+Periode sebelumnya dikirim browser pada setiap chat sebagai baris ringkas (`src/data/historyPayload.ts`, field `periods`), dikompresi gzip di browser sehingga belasan periode ribuan karyawan muat dalam batas 4 MB; periode tertua baru dibuang bila hasil kompresi masih melebihi batas. Backend membuka kompresi dengan batas 64 MB setelah dibuka, lalu memvalidasi ulang. Nama hanya dikirim untuk karyawan yang sudah tidak ada di periode aktif dan, seperti nama lain, diganti kode `KARYAWAN_n` sebelum sampai ke Gemini. Pengaturan panel (rentang kontrak, periode pembanding, pengaturan pensiun) ikut dikirim agar jawaban AI sama dengan yang terlihat di dashboard. Tombol "Ringkasan periode ini" hanya mengirim permintaan dalam bahasa biasa; isi ringkasan disusun Gemini dari pemanggilan alat. Setelah Portal HC tersambung, backend dapat membaca riwayat langsung dari sumbernya sehingga browser tidak perlu mengirim `periods`.
+
 ## Urutan implementasi
 
-1. **Sudah:** API lokal, sesi sementara satu jam, pembatasan request 4 MB, filter dan agregasi di server, adapter Gemini [Interactions API](https://ai.google.dev/gemini-api/docs/get-started) dengan `store: false`, serta panel chatbot.
+1. **Sudah:** API lokal, sesi sementara satu jam, pembatasan request 4 MB (setelah kompresi) dan 64 MB (setelah dibuka), fungsi Vercel hanya menerima permintaan dengan Origin dari domain sendiri, teks hasil alat dibersihkan sebelum dikirim ke Gemini, filter dan agregasi di server, adapter Gemini [Interactions API](https://ai.google.dev/gemini-api/docs/get-started) dengan `store: false`, serta panel chatbot.
 2. **Berikutnya:** pindahkan parser dan validasi lengkap Excel ke backend. Saat ini browser memvalidasi file dan backend hanya memeriksa bentuk dasar snapshot yang dikirim.
 3. **Sebelum deployment:** autentikasi dan otorisasi, audit, penyimpanan aman jika diperlukan, pembatasan kuota per pengguna, serta evaluasi jawaban AI terhadap angka kanonik. [Batas free tier](https://ai.google.dev/gemini-api/docs/rate-limits) bergantung pada model dan proyek; baca kuota aktual di Google AI Studio.
 

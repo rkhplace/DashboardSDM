@@ -14,6 +14,8 @@ type Props = {
   sessionId: string
   query: string
   retirement?: RetirementSettings
+  contractMonths?: number
+  compareWith?: string
 }
 
 type Segment = { key: string; value: number; color: string }
@@ -71,7 +73,7 @@ function Pyramid({ rows, label, selected, onSelect }: { rows: PyramidRow[]; labe
   </div>)}</>
 }
 
-export function SnapshotCharts({ records, asOf, filters, onChange, sessionId, query, retirement }: Props) {
+export function SnapshotCharts({ records, asOf, filters, onChange, sessionId, query, retirement, contractMonths, compareWith }: Props) {
   const [showAllDivisions, setShowAllDivisions] = useState(false)
   const [hoveredSliceIndex, setHoveredSliceIndex] = useState<number | null>(null)
   const total = records.length
@@ -185,7 +187,7 @@ export function SnapshotCharts({ records, asOf, filters, onChange, sessionId, qu
       </SectionCard>
       <section className="section-card snapshot-card workforce-ai-card" aria-label="AI Workforce Intelligence">
         <div className="workforce-ai-header"><span className="workforce-ai-mark"><Sparkles size={18}/></span><div><h2>Chatbot SDM</h2><p>Tanya tentang data periode aktif</p></div></div>
-        <ChatPanel sessionId={sessionId} filters={filters} query={query} count={total} retirement={retirement} onApplyFilters={onChange}/>
+        <ChatPanel sessionId={sessionId} filters={filters} query={query} count={total} retirement={retirement} contractMonths={contractMonths} compareWith={compareWith} onApplyFilters={onChange}/>
       </section>
     </div>
   </div>

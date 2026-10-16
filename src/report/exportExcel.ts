@@ -51,12 +51,23 @@ export async function exportExcel(report: Report, filename: string) {
     ...tableRows(report.retirement.windows, true), [],
     ...tableRows(report.retirement.divisions, true),
   ]
+  const pairs = (items: [string, string][]): XlsxRow[] => items.map(([key, value]): XlsxRow => [{ value: key, fontWeight: 'bold' }, { value, type: String }])
+  const { contracts, trend } = report
   const sheets = [
     { ...sheet('Ringkasan', summary, 0), columns: [{ width: 34 }, { width: 70 }] },
     sheet('Komposisi', composition, 0),
     sheet('Matriks band', tableRows(report.bandMatrix)),
+    ...(trend ? [
+      sheet('Tren antar-periode', [...pairs(trend.settings), ...(trend.settings.length ? [[] as XlsxRow] : []), ...tableRows(trend.periods, true)], 0),
+      sheet('Masuk & keluar', tableRows(trend.movements)),
+    ] : []),
     sheet('Proyeksi pensiun', retirement, 0),
     sheet('Daftar pensiun', tableRows(report.retirement.candidates)),
+    ...(contracts ? [
+      sheet('Kontrak PKWT', [...pairs(contracts.settings), ...(contracts.followUpNote ? [[{ value: contracts.followUpNote, type: String }] as XlsxRow] : []), [], ...tableRows(contracts.months, true), [], ...tableRows(contracts.divisions, true)], 0),
+      sheet('Daftar kontrak', tableRows(contracts.list)),
+      ...(contracts.followUp ? [sheet('Tindak lanjut kontrak', tableRows(contracts.followUp))] : []),
+    ] : []),
     sheet('Daftar karyawan', tableRows(report.employees)),
   ]
   await writeXlsxFile(sheets as never, { fontFamily: 'Calibri', fontSize: 11 }).toFile(filename)

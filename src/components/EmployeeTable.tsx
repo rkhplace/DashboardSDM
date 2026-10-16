@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, RotateCcw, Search } from 'lucide-react'
+import { hasContractColumn, isContract } from '../analytics/contracts'
+import { formatDate } from '../analytics/format'
 import { educationOf, fullYears, genderOf } from '../analytics/workforce'
 import type { EmployeeRecord } from '../types/workforce'
 import { FilterDropdown } from './FilterDropdown'
 
 const PAGE_SIZE = 50
 
-export function EmployeeTable({ records, asOf }: { records: EmployeeRecord[]; asOf: string }) {
+export function EmployeeTable({ records, asOf, contractColumn }: { records: EmployeeRecord[]; asOf: string; contractColumn?: boolean }) {
+  const showContract = contractColumn ?? hasContractColumn(records)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [localFilters, setLocalFilters] = useState({ status: '', gender: '', division: '', activity: '' })
@@ -38,7 +41,7 @@ export function EmployeeTable({ records, asOf }: { records: EmployeeRecord[]; as
       <div className="employee-filter-field"><span>Activity</span><FilterDropdown label="Activity" options={activities} selected={localFilters.activity ? [localFilters.activity] : []} onChange={values => updateLocalFilter('activity', values[0] ?? '')}/></div>
       <button type="button" className="employee-filter-reset" onClick={() => { setLocalFilters({ status: '', gender: '', division: '', activity: '' }); setPage(1) }} disabled={!Object.values(localFilters).some(Boolean)}><RotateCcw size={14}/> Reset</button>
     </div>
-    <div className="table-scroll" role="region" aria-label="Tabel daftar karyawan, dapat digulir" tabIndex={0}><table className="employee-table"><thead><tr><th>NIP</th><th>Nama</th><th>Band</th><th>Jabatan</th><th>Direktorat</th><th>Divisi</th><th>Bagian</th><th>Status</th><th>Gender</th><th>Usia</th><th>Masa kerja</th><th>Pendidikan</th><th>Activity</th></tr></thead><tbody>{visible.map(record => <tr key={record.nip}><td className="nip-cell">{record.nip}</td><td>{record.name}</td><td>{record.band ?? '—'}</td><td>{record.position}</td><td>{record.directorate}</td><td>{record.division || '—'}</td><td>{record.section || '—'}</td><td>{record.status}</td><td>{genderOf(record) === 'L' ? 'L' : genderOf(record) === 'P' ? 'P' : '—'}</td><td>{fullYears(record.birthDate, asOf) ?? '—'}</td><td>{fullYears(record.joinDate, asOf) ?? '—'}</td><td>{educationOf(record)}</td><td>{record.activity || '—'}</td></tr>)}</tbody></table>{!visible.length && <div className="empty-table">Tidak ada karyawan yang sesuai.</div>}</div>
+    <div className="table-scroll" role="region" aria-label="Tabel daftar karyawan, dapat digulir" tabIndex={0}><table className={`employee-table${showContract ? ' has-contract' : ''}`}><thead><tr><th className="col-nip">NIP</th><th className="col-name">Nama</th><th className="col-band">Band</th><th className="col-position">Jabatan</th><th className="col-directorate">Direktorat</th><th className="col-division">Divisi</th><th className="col-section">Bagian</th><th className="col-status">Status</th>{showContract && <th className="col-contract">Selesai kontrak</th>}<th className="col-gender">Gender</th><th className="col-age">Usia</th><th className="col-tenure">Masa kerja</th><th className="col-education">Pendidikan</th><th className="col-activity">Activity</th></tr></thead><tbody>{visible.map(record => <tr key={record.nip}><td className="col-nip nip-cell">{record.nip}</td><td className="col-name">{record.name}</td><td className="col-band">{record.band ?? '—'}</td><td className="col-position">{record.position}</td><td className="col-directorate">{record.directorate}</td><td className="col-division">{record.division || '—'}</td><td className="col-section">{record.section || '—'}</td><td className="col-status">{record.status}</td>{showContract && <td className={`col-contract${isContract(record) && record.contractEnd && record.contractEnd <= asOf ? ' is-overdue-cell' : ''}`}>{record.contractEnd ? formatDate(record.contractEnd) : isContract(record) ? 'Belum diisi' : '—'}</td>}<td className="col-gender">{genderOf(record) === 'L' ? 'L' : genderOf(record) === 'P' ? 'P' : '—'}</td><td className="col-age">{fullYears(record.birthDate, asOf) ?? '—'}</td><td className="col-tenure">{fullYears(record.joinDate, asOf) ?? '—'}</td><td className="col-education">{educationOf(record)}</td><td className="col-activity">{record.activity || '—'}</td></tr>)}</tbody></table>{!visible.length && <div className="empty-table">Tidak ada karyawan yang sesuai.</div>}</div>
     <div className="pagination"><span>Menampilkan {matched.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–{Math.min(currentPage * PAGE_SIZE, matched.length)} dari {matched.length}</span><div><button type="button" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1} aria-label="Halaman sebelumnya"><ChevronLeft size={16}/></button><span>{currentPage} / {pages}</span><button type="button" onClick={() => setPage(currentPage + 1)} disabled={currentPage === pages} aria-label="Halaman berikutnya"><ChevronRight size={16}/></button></div></div>
   </section>
 }

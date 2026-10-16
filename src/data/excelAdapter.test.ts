@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { inspectExcel } from './excelAdapter'
+import { dateString, inspectExcel } from './excelAdapter'
 import { lastDayOfMonth, validateInspection } from './validateImport'
 
 describe('Excel adapter against supplied workbook', () => {
@@ -25,5 +25,12 @@ describe('Excel adapter against supplied workbook', () => {
     expect(lastDayOfMonth('2026-07')).toBe('2026-07-31')
     expect(lastDayOfMonth('2024-02')).toBe('2024-02-29')
     expect(lastDayOfMonth('2026-13')).toBeNull()
+  })
+  it('reads text dates in common Indonesian formats and rejects impossible ones', () => {
+    expect(dateString('05.08.2027')).toBe('2027-08-05')
+    expect(dateString('5/8/2027')).toBe('2027-08-05')
+    expect(dateString('2027-08-05')).toBe('2027-08-05')
+    expect(dateString('31.02.2027')).toBeNull()
+    expect(dateString('Agustus 2027')).toBeNull()
   })
 })

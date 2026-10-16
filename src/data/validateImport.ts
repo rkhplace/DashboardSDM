@@ -1,3 +1,4 @@
+import { isContract } from '../analytics/contracts'
 import { EDUCATION, fullYears } from '../analytics/workforce'
 import type { EmployeeRecord } from '../types/workforce'
 import type { ExcelInspection } from './excelAdapter'
@@ -66,6 +67,14 @@ export function validateInspection(inspection: ExcelInspection, asOf: string): I
       return record.joinDate !== null && joined !== null && joined < 17
     }), 'Kemungkinan tanggal lahir atau tanggal masuk tertukar.'),
     issue('Kolom USIA berbeda dari tanggal lahir', records.filter(record => { const value = age(record); return value !== null && record.sourceAge !== null && Math.abs(record.sourceAge - value) > 1 }), 'Dashboard memakai usia hasil hitung dari tanggal lahir.'),
+    issue('Kolom MASKER berbeda dari tanggal masuk', records.filter(record => { const value = fullYears(record.joinDate, asOf); return value !== null && record.sourceTenure !== null && Math.abs(record.sourceTenure - value) > 1 }), 'Masa kerja di file tidak cocok dengan tanggal masuk. Dashboard memakai masa kerja hasil hitung dari tanggal masuk; periksa kemungkinan salah tulis.'),
+    ...(inspection.contractEndColumn ? [
+      { label: 'Tanggal selesai kontrak tidak terbaca', count: inspection.invalidContractEnd?.length ?? 0, hint: `Isi kolom ${inspection.contractEndColumn} dengan tanggal Excel atau format dd.mm.yyyy.`, nips: inspection.invalidContractEnd ?? [] },
+      issue('PKWT tanpa tanggal selesai kontrak', records.filter(record => isContract(record) && !record.contractEnd && !inspection.invalidContractEnd?.includes(record.nip)), 'Karyawan ini tidak masuk proyeksi kontrak berakhir.'),
+      issue('Tanggal selesai kontrak sebelum tanggal masuk', records.filter(record => record.contractEnd && record.joinDate && record.contractEnd < record.joinDate), 'Kemungkinan salah tulis tahun atau tanggal tertukar.'),
+      issue('Kontrak PKWT sudah berakhir per periode ini', records.filter(record => isContract(record) && record.contractEnd && record.contractEnd <= asOf), 'Masih tercatat di file. Periksa perpanjangan kontrak atau status karyawan.'),
+      issue('Tanggal selesai kontrak terisi pada karyawan non-PKWT', records.filter(record => !isContract(record) && record.contractEnd), 'Statusnya bukan PKWT, jadi tanggal ini diabaikan dalam proyeksi kontrak. Kosongkan tanggalnya bila sudah diangkat tetap, atau periksa statusnya.'),
+    ] : []),
     issue('Kode jenis kelamin tidak dikenal', records.filter(record => record.genderCode !== 1 && record.genderCode !== 2), 'Kode yang dikenali: 1 = laki-laki, 2 = perempuan.'),
     issue('Pendidikan kosong', records.filter(record => record.educationCode === null)),
     issue('Kode pendidikan tidak dikenal', records.filter(record => record.educationCode !== null && !EDUCATION[record.educationCode]), `Kode yang dikenali: ${Object.entries(EDUCATION).map(([code, name]) => `${code}=${name}`).join(', ')}.`),
@@ -73,6 +82,7 @@ export function validateInspection(inspection: ExcelInspection, asOf: string): I
     issue('Band tidak tersedia', records.filter(record => record.band === null), 'Dihitung pada kolom "Tidak tersedia" di matriks band.'),
     issue('Activity kosong', records.filter(record => !record.activity), 'Tampil sebagai (KOSONG) pada grafik activity.'),
     issue('Jenis jabatan kosong', records.filter(record => !record.positionType), 'Posisi struktural dipakai untuk risiko suksesi; baris kosong dianggap non-struktural.'),
+    ...(inspection.invalidNumbers ?? []).map(item => ({ label: `Kolom ${item.column} berisi nilai bukan angka`, count: item.count, hint: 'Dibaca sebagai kosong. Periksa salah ketik, misalnya huruf atau spasi di kolom angka.', nips: item.nips })),
     { label: 'Sel berisi error Excel (#N/A, #REF!, dll.)', count: errorCells.reduce((sum, item) => sum + item.count, 0), hint: errorCells.map(item => `${item.column} (${item.count})`).join(', '), nips: [...new Set(errorCells.flatMap(item => item.nips))] },
     { label: 'Label beda penulisan (huruf besar/spasi)', count: labelFindings.length, hint: labelFindings.slice(0, 4).map(item => `${item.field}: ${item.variants.join(' / ')}`).join('; ') + (labelFindings.length > 4 ? '; …' : ''), nips: [...new Set(labelFindings.flatMap(item => item.nips))] },
     { label: 'Kolom opsional tidak ada', count: missingOptional.length, hint: missingOptional.join(', ') },

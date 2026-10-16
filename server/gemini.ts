@@ -1,7 +1,10 @@
 import { filterTool } from './chatExtras.ts'
+import { contractTool } from './contractTool.ts'
 import { listTool } from './identity.ts'
+import { qualityTool } from './qualityTool.ts'
 import { workforceTool } from './query.ts'
 import { retirementTool } from './retirementTool.ts'
+import { trendTool } from './trendTool.ts'
 
 export interface GeminiReply { answer: string; evidence?: { metric: string; value: number }[] }
 
@@ -9,31 +12,48 @@ type Step = { type?: string; name?: string; id?: string; arguments?: unknown; co
 
 type Runner = (arguments_: unknown) => unknown
 /** Tool runners for one chat turn; only the ones provided are offered to the model. */
-export interface TurnTools { runQuery?: Runner; applyFilters?: Runner; listEmployees?: Runner; projectRetirement?: Runner }
+export interface TurnTools { runQuery?: Runner; applyFilters?: Runner; listEmployees?: Runner; projectRetirement?: Runner; projectContracts?: Runner; queryTrends?: Runner; checkDataQuality?: Runner }
 const TOOLS = [
   { name: 'query_workforce', definition: workforceTool, runner: 'runQuery' },
   { name: 'set_dashboard_filters', definition: filterTool, runner: 'applyFilters' },
   { name: 'list_employees', definition: listTool, runner: 'listEmployees' },
   { name: 'project_retirement', definition: retirementTool, runner: 'projectRetirement' },
+  { name: 'project_contracts', definition: contractTool, runner: 'projectContracts' },
+  { name: 'query_trends', definition: trendTool, runner: 'queryTrends' },
+  { name: 'check_data_quality', definition: qualityTool, runner: 'checkDataQuality' },
 ] as const
 const MAX_ROUNDS = 5
+const RETRYABLE = new Set([500, 502, 503, 504])
 
 export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<GeminiReply> {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new ServiceError(503, 'AI_NOT_CONFIGURED', 'GEMINI_API_KEY belum diatur pada backend.')
-  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
+  let model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite'
   const history: unknown[] = [{ type: 'user_input', content: [{ type: 'text', text: prompt }] }]
   const evidence: { metric: string; value: number }[] = []
   const offered = TOOLS.filter(tool => tools[tool.runner])
   for (let round = 0; round < MAX_ROUNDS; round++) {
     // The last round goes out without tools so the model must answer with what it already gathered.
     const finalRound = round === MAX_ROUNDS - 1
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+    const send = (useModel: string) => fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({ model, store: false, input: history, ...(offered.length && !finalRound ? { tools: offered.map(tool => tool.definition) } : {}) }),
+      body: JSON.stringify({ model: useModel, store: false, input: history, ...(offered.length && !finalRound ? { tools: offered.map(tool => tool.definition) } : {}) }),
       signal: AbortSignal.timeout(25000),
     })
+    let response = await send(model)
+    // 5xx from Google is usually a short overload ("high demand"): retry once, then try the fallback model if one is set.
+    if (RETRYABLE.has(response.status)) {
+      console.error(`[gemini] HTTP ${response.status} (model ${model}), retrying once: ${(await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`)
+      await new Promise(resolve => setTimeout(resolve, Number(process.env.GEMINI_RETRY_DELAY_MS ?? 1000)))
+      response = await send(model)
+    }
+    const fallback = process.env.GEMINI_FALLBACK_MODEL?.trim()
+    if (RETRYABLE.has(response.status) && fallback && fallback !== model) {
+      console.error(`[gemini] HTTP ${response.status} (model ${model}) again, switching to fallback ${fallback}`)
+      model = fallback
+      response = await send(model)
+    }
     if (!response.ok) {
       // Log Google's own error (status + reason) server-side only; it never contains the API key.
       const detail = (await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 600)
@@ -41,7 +61,8 @@ export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<
       if (response.status === 429) throw new ServiceError(429, 'AI_RATE_LIMIT', 'Batas penggunaan Gemini tercapai. Coba lagi nanti.')
       if (response.status === 400 || response.status === 401 || response.status === 403) throw new ServiceError(502, 'AI_REJECTED', 'Gemini menolak permintaan. Periksa GEMINI_API_KEY dan GEMINI_MODEL di backend.')
       if (response.status === 404) throw new ServiceError(502, 'AI_MODEL_NOT_FOUND', `Model Gemini "${model}" tidak ditemukan. Periksa GEMINI_MODEL di backend.`)
-      throw new ServiceError(502, 'AI_UNAVAILABLE', 'Gemini tidak dapat menjawab saat ini.')
+      if (RETRYABLE.has(response.status)) throw new ServiceError(503, 'AI_BUSY', `Layanan Gemini sedang sibuk (kode ${response.status}). Coba lagi beberapa saat.`)
+      throw new ServiceError(502, 'AI_UNAVAILABLE', `Gemini tidak dapat menjawab saat ini (kode ${response.status}).`)
     }
     const result = await response.json() as { steps?: Step[] }
     const steps = result.steps ?? []
@@ -51,14 +72,20 @@ export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<
       if (calls.length > 8) throw new ServiceError(502, 'AI_TOOL_LIMIT', 'Analisis membutuhkan terlalu banyak perhitungan sekaligus. Coba pertanyaan yang lebih spesifik.')
       for (const call of calls) {
         const runner = offered.find(tool => tool.name === call.name)?.runner
-        const output = runner ? tools[runner]!(call.arguments) : { error: 'Alat tidak dikenal.' }
+        let output: unknown
+        try { output = runner ? tools[runner]!(call.arguments) : { error: 'Alat tidak dikenal.' } }
+        catch (error) {
+          // A failing tool should not sink the whole answer; Gemini can explain that the figure is unavailable.
+          console.error(`[gemini] tool ${call.name} failed`, error instanceof Error ? error.message : typeof error)
+          output = { error: 'Perhitungan ini gagal dijalankan. Sampaikan bahwa angkanya belum tersedia.' }
+        }
         if (output && typeof output === 'object' && !Array.isArray(output)) {
           const data = output as Record<string, unknown>
           const metric = typeof data.operation === 'string' ? data.operation : 'query'
           const value = typeof data.average === 'number' ? data.average : data.matched
           if (typeof value === 'number') evidence.push({ metric, value })
         }
-        history.push({ type: 'function_result', name: call.name, call_id: call.id, result: [{ type: 'text', text: JSON.stringify(output) }] })
+        history.push({ type: 'function_result', name: call.name, call_id: call.id, result: [{ type: 'text', text: JSON.stringify(toolSafe(output)) }] })
       }
       continue
     }
@@ -68,6 +95,22 @@ export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<
     throw new ServiceError(502, 'AI_EMPTY_RESPONSE', 'Gemini tidak menghasilkan jawaban teks.')
   }
   throw new ServiceError(502, 'AI_TOOL_LIMIT', 'Analisis membutuhkan terlalu banyak langkah. Coba pertanyaan yang lebih spesifik.')
+}
+
+const MAX_TOOL_TEXT = 200
+
+/**
+ * Tool results carry text straight from the Excel file (unit names, positions, statuses). Strip control
+ * characters and cap each string so a cell cannot smuggle long instructions or break the result apart.
+ */
+export function toolSafe(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') {
+    const clean = value.replace(/\p{Cc}/gu, ' ').replace(/\s+/g, ' ').trim()
+    return clean.length > MAX_TOOL_TEXT ? `${clean.slice(0, MAX_TOOL_TEXT)}…` : clean
+  }
+  if (depth > 12 || value === null || typeof value !== 'object') return value
+  if (Array.isArray(value)) return value.map(item => toolSafe(item, depth + 1))
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [toolSafe(key, depth + 1) as string, toolSafe(item, depth + 1)]))
 }
 
 export class ServiceError extends Error {

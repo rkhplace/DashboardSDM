@@ -7,7 +7,8 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => 
 const ImportPage = lazy(() => import('./pages/ImportPage').then(module => ({ default: module.ImportPage })))
 
 function RequireUpload({ children }: { children: React.ReactNode }) {
-  const { snapshot } = useWorkforceSession()
+  const { snapshot, restoring } = useWorkforceSession()
+  if (!snapshot && restoring) return <div className="route-loading">Membuka periode terakhir...</div>
   return snapshot ? children : <Navigate to="/impor" replace />
 }
 

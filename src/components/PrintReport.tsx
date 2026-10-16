@@ -44,5 +44,21 @@ export function PrintReport({ report }: { report: Report }) {
     <Table table={report.retirement.divisions} bars/>
     <Table table={report.retirement.candidates} limit={40}/>
     <p className="print-note">Asumsi pensiun pada tanggal mencapai usia pensiun; posisi kunci = jabatan struktural. Angka mengikuti file dan filter aktif saat laporan dibuat.</p>
+    {report.trend && <>
+      <h2 className="print-page-break">Analisis antar-periode</h2>
+      {report.trend.settings.length > 0 && <dl className="print-meta">{report.trend.settings.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>}
+      <Table table={report.trend.periods}/>
+      <Table table={report.trend.movements} limit={40}/>
+    </>}
+    {report.contracts && <>
+      <h2 className="print-page-break">Kontrak PKWT berakhir</h2>
+      <dl className="print-meta">{report.contracts.settings.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl>
+      {report.contracts.followUpNote && <p className="print-note">{report.contracts.followUpNote}</p>}
+      <div className="print-grid print-grid-retirement"><Table table={report.contracts.months}/></div>
+      <Table table={report.contracts.divisions} bars/>
+      {report.contracts.followUp && <Table table={report.contracts.followUp} limit={40}/>}
+      <Table table={report.contracts.list} limit={40}/>
+      <p className="print-note">Kontrak PKWT adalah early warning bagi atasan untuk memutuskan perpanjang, angkat tetap, atau selesai. PKWT yang keluar tidak dihitung sebagai turnover.</p>
+    </>}
   </article>
 }

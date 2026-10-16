@@ -64,3 +64,13 @@ describe('July 2026 snapshot reconciliation', () => {
     expect(filtered.every(record => tenureGroup(fullYears(record.joinDate, snapshot.asOf)) === '<5')).toBe(true)
   })
 })
+
+describe('filters across periods', () => {
+  it('releases filter values that do not exist in another period', async () => {
+    const { pruneFilters } = await import('./filters')
+    const result = pruneFilters({ ...emptyFilters, division: [snapshot.records[0].division, 'DIVISI HILANG'], gender: ['L'] }, snapshot.records, snapshot.asOf)
+    expect(result.filters.division).toEqual([snapshot.records[0].division])
+    expect(result.filters.gender).toEqual(['L'])
+    expect(result.released).toEqual(['Divisi: DIVISI HILANG'])
+  })
+})

@@ -1,4 +1,5 @@
 import { AGE_GROUPS, TENURE_GROUPS, ageGroup, bandMatrix, countBy, educationOf, fullYears, genderOf, summarize, tenureGroup } from '../analytics/workforce'
+import { hasContractColumn, projectContracts } from '../analytics/contracts'
 import type { EmployeeRecord } from '../types/workforce'
 
 /** The same aggregates used by the dashboard, calculated from the active session. */
@@ -24,5 +25,22 @@ export function buildAggregateContext(records: EmployeeRecord[], asOf: string) {
       return { group, male: people.filter(record => genderOf(record) === 'L').length, female: people.filter(record => genderOf(record) === 'P').length, unknown: people.filter(record => genderOf(record) === 'UNKNOWN').length }
     }),
     bandByDivision: bandMatrix(records),
+    pkwtContracts: contractSummary(records, asOf),
+  }
+}
+
+/** PKWT contract end summary; counts only, no individual dates. */
+function contractSummary(records: EmployeeRecord[], asOf: string) {
+  if (!hasContractColumn(records)) return { endDateColumnAvailable: false, pkwt: projectContracts(records, asOf, 1).contracts }
+  const [in3, in6, in12] = [3, 6, 12].map(months => projectContracts(records, asOf, months))
+  return {
+    endDateColumnAvailable: true,
+    pkwt: in12.contracts,
+    missingEndDate: in12.missingEndDate,
+    alreadyEnded: in12.expired,
+    endingNext3Months: in3.endingWithinHorizon,
+    endingNext6Months: in6.endingWithinHorizon,
+    endingNext12Months: in12.endingWithinHorizon,
+    endingPerMonthNext12: in12.months.map(month => ({ month: month.month, count: month.count })),
   }
 }
