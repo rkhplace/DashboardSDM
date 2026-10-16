@@ -8,12 +8,16 @@ function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** Long answers (an executive summary, a list of names) come back as history; accept them and let the prompt clip them. */
+const MAX_HISTORY_TURNS = 20
+const MAX_TURN_TEXT = 20000
+
 function validateHistory(value: unknown): Turn[] {
   if (value === undefined) return []
-  if (!Array.isArray(value) || value.length > 8 || value.some(turn => !object(turn) || !['user', 'assistant'].includes(String(turn.role)) || typeof turn.text !== 'string' || turn.text.length > 1000)) {
+  if (!Array.isArray(value) || value.length > MAX_HISTORY_TURNS || value.some(turn => !object(turn) || !['user', 'assistant'].includes(String(turn.role)) || typeof turn.text !== 'string' || turn.text.length > MAX_TURN_TEXT)) {
     throw new ServiceError(400, 'INVALID_HISTORY', 'Riwayat percakapan tidak valid.')
   }
-  return value.map(turn => ({ role: turn.role, text: turn.text }) as Turn)
+  return value.slice(-8).map(turn => ({ role: turn.role, text: turn.text }) as Turn)
 }
 
 export async function answerStatelessChat(input: unknown, generate: Generate = askGemini) {

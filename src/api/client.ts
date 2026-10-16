@@ -57,6 +57,9 @@ export const gzip: Compress = async text => {
   catch { return null }
 }
 
+/** The server only reads the start of each earlier turn, so there is no point sending more. */
+const HISTORY_TURN_CHARS = 2000
+
 export interface PreparedBody { body: string | Blob; headers: Record<string, string>; periodsSent: number; periodsDropped: number }
 
 /**
@@ -103,7 +106,7 @@ export async function sendChat(sessionId: string, snapshot: EmployeeSnapshot, me
   const settings = { contracts: context.contractMonths ? { months: context.contractMonths } : undefined, compareWith: context.compareWith }
   const stateless = import.meta.env.PROD
   const base = stateless
-    ? { snapshot, message, filters, query, history: history.slice(-8), conversationId, retirement, ...settings }
+    ? { snapshot, message, filters, query, history: history.slice(-8).map(turn => ({ ...turn, text: turn.text.length > HISTORY_TURN_CHARS ? turn.text.slice(0, HISTORY_TURN_CHARS) : turn.text })), conversationId, retirement, ...settings }
     : { message, filters, query, conversationId, retirement, ...settings }
   const { body, headers } = await prepareBody(base, snapshot, context.periods)
   return api<ChatReply>(stateless ? '/api/chat' : `/api/v1/sessions/${sessionId}/ai/chat`, { method: 'POST', headers, body })
