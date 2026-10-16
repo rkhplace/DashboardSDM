@@ -318,7 +318,7 @@
 @media(max-width:1100px){.trend-column{height:auto}.trend-scroll{max-height:420px}}
 
 /* Chat quick actions */
-.workforce-chat-actions{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 0}
+.workforce-chat-actions{display:flex;gap:6px;flex-wrap:wrap;padding:10px 0 8px}
 .workforce-chat-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid #bcd0e6;background:#f1f6fc;color:#173b68;border-radius:999px;padding:5px 11px;font-size:11px;font-weight:600}
 .workforce-chat-actions button:hover:not(:disabled){background:#e3edf8}
 
