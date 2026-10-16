@@ -22,7 +22,7 @@ it('drops the tools on the last round so a looping model still answers', async (
   expect(bodies[4].tools).toBeUndefined()
 })
 
-it('retries a 503 once, then reports the status code if Google is still busy', async () => {
+it('retries a 503 with backoff, then reports the status code if Google is still busy', async () => {
   vi.stubEnv('GEMINI_API_KEY', 'test-key')
   let calls = 0
   vi.stubGlobal('fetch', vi.fn(async () => {
@@ -52,7 +52,7 @@ it('switches to GEMINI_FALLBACK_MODEL when the main model stays overloaded', asy
       : new Response('busy', { status: 503 })
   }))
   expect((await askGemini('tanya')).answer).toBe('Dari cadangan.')
-  expect(models).toEqual(['gemini-3.1-flash-lite', 'gemini-3.1-flash-lite', 'backup-model'])
+  expect(models).toEqual(['gemini-3.1-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite', 'backup-model'])
 })
 
 describe('tool output sanitising', () => {
@@ -82,4 +82,18 @@ it('reports a failing tool to Gemini instead of failing the whole answer', async
   const reply = await askGemini('tanya', { runQuery: () => { throw new Error('bug') } })
   expect(reply.answer).toBe('Angkanya belum tersedia.')
   expect(results[0]).toContain('gagal dijalankan')
+})
+
+it('keeps trying through a short overload before giving up', async () => {
+  vi.stubEnv('GEMINI_API_KEY', 'test-key')
+  let calls = 0
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    calls++
+    return calls <= 2
+      ? new Response('{"error":{"code":503,"status":"UNAVAILABLE"}}', { status: 503, headers: { 'Retry-After': '0' } })
+      : new Response(JSON.stringify({ steps: [{ type: 'model_output', content: [{ type: 'text', text: 'Akhirnya.' }] }] }), { status: 200 })
+  }))
+  vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  expect((await askGemini('tanya')).answer).toBe('Akhirnya.')
+  expect(calls).toBe(3)
 })

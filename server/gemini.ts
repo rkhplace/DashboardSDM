@@ -24,6 +24,17 @@ const TOOLS = [
 ] as const
 const MAX_ROUNDS = 5
 const RETRYABLE = new Set([500, 502, 503, 504])
+/** Pauses before each retry, as multiples of GEMINI_RETRY_DELAY_MS (default 1 s): about 1 s, then 3 s. */
+const RETRY_STEPS = [1, 3]
+
+/** Waits as long as Google asks (Retry-After, capped at 8 s) or the next backoff step, with a little jitter. */
+function retryDelay(response: Response, attempt: number): number {
+  const base = Number(process.env.GEMINI_RETRY_DELAY_MS ?? 1000)
+  const asked = Number(response.headers.get('retry-after'))
+  if (Number.isFinite(asked) && asked > 0) return Math.min(asked * 1000, 8000)
+  const step = base * RETRY_STEPS[Math.min(attempt, RETRY_STEPS.length - 1)]
+  return Math.round(step * (0.8 + Math.random() * 0.4))
+}
 
 export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<GeminiReply> {
   const key = process.env.GEMINI_API_KEY
@@ -42,17 +53,23 @@ export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<
       signal: AbortSignal.timeout(25000),
     })
     let response = await send(model)
-    // 5xx from Google is usually a short overload ("high demand"): retry once, then try the fallback model if one is set.
-    if (RETRYABLE.has(response.status)) {
-      console.error(`[gemini] HTTP ${response.status} (model ${model}), retrying once: ${(await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`)
-      await new Promise(resolve => setTimeout(resolve, Number(process.env.GEMINI_RETRY_DELAY_MS ?? 1000)))
+    // 5xx from Google is usually a short overload ("high demand"): retry with growing pauses,
+    // then switch to the fallback model (with one retry of its own) if one is set.
+    for (let attempt = 0; RETRYABLE.has(response.status) && attempt < RETRY_STEPS.length; attempt++) {
+      const wait = retryDelay(response, attempt)
+      console.error(`[gemini] HTTP ${response.status} (model ${model}), retry ${attempt + 1}/${RETRY_STEPS.length} in ${wait} ms: ${(await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`)
+      await new Promise(resolve => setTimeout(resolve, wait))
       response = await send(model)
     }
     const fallback = process.env.GEMINI_FALLBACK_MODEL?.trim()
     if (RETRYABLE.has(response.status) && fallback && fallback !== model) {
-      console.error(`[gemini] HTTP ${response.status} (model ${model}) again, switching to fallback ${fallback}`)
+      console.error(`[gemini] HTTP ${response.status} (model ${model}) still failing, switching to fallback ${fallback}`)
       model = fallback
       response = await send(model)
+      if (RETRYABLE.has(response.status)) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay(response, 0)))
+        response = await send(model)
+      }
     }
     if (!response.ok) {
       // Log Google's own error (status + reason) server-side only; it never contains the API key.
