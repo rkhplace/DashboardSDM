@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` menyalakan Vite dan API lokal pada `127.0.0.1:8787`. File `.env` sudah disiapkan; isi `GEMINI_API_KEY` dengan key dari Google AI Studio untuk mencoba chatbot, lalu mulai ulang server. File `.env` diabaikan oleh Git. Tanpa key, upload dan dashboard tetap berjalan, tetapi chatbot menampilkan pesan konfigurasi saat ditanya. Model awal adalah `gemini-3.1-flash-lite` dan dapat diganti melalui `GEMINI_MODEL`.
+`npm run dev` menyalakan Vite dan API lokal pada `127.0.0.1:8787`. File `.env` sudah disiapkan; isi `GEMINI_API_KEY` dengan key dari Google AI Studio untuk mencoba chatbot, lalu mulai ulang server. File `.env` diabaikan oleh Git. Tanpa key, upload dan dashboard tetap berjalan, tetapi chatbot menampilkan pesan konfigurasi saat ditanya. Model awal adalah `gemini-3.1-flash-lite` dan dapat diganti melalui `GEMINI_MODEL`. Bila Google membalas sibuk (HTTP 5xx), backend mencoba ulang dua kali dengan jeda bertambah lalu beralih ke `GEMINI_FALLBACK_MODEL` (contoh: `gemini-3.5-flash-lite`) bila diatur; isi variabel yang sama di Vercel.
 
 ## Deploy di Vercel
 
