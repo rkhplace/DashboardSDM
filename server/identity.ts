@@ -33,7 +33,10 @@ export class IdentityMap {
   redact(text: string, allRecords: EmployeeRecord[]): string {
     let result = text
     const candidates = allRecords
-      .flatMap(record => [{ record, token: record.name }, { record, token: record.nip }])
+      .flatMap(record => [
+        { record, token: record.name },
+        { record, token: record.nip },
+      ])
       .filter(item => item.token && item.token.length >= 3)
       .sort((a, b) => b.token.length - a.token.length)
     for (const { record, token } of candidates) {
@@ -57,28 +60,43 @@ export class IdentityMap {
 export const listTool = {
   type: 'function',
   name: 'list_employees',
-  description: 'Ambil daftar karyawan individual pada file dan filter aktif, untuk pertanyaan "siapa", "sebutkan nama", "daftar karyawan", atau detail seorang karyawan. Nama dan NIP disamarkan sebagai kode KARYAWAN_n; tulis kode itu persis di jawaban dan sistem menggantinya dengan nama asli (NIP_KARYAWAN_n untuk NIP). Isi refs untuk karyawan yang sudah disebut dengan kode, atau filters untuk sekelompok karyawan.',
+  description: [
+    'Ambil daftar karyawan individual pada file dan filter aktif, untuk pertanyaan "siapa", "sebutkan nama", "daftar karyawan", atau detail seorang karyawan.',
+    'Nama dan NIP disamarkan sebagai kode KARYAWAN_n; tulis kode itu persis di jawaban dan sistem menggantinya dengan nama asli (NIP_KARYAWAN_n untuk NIP).',
+    'Isi refs untuk karyawan yang sudah disebut dengan kode, atau filters untuk sekelompok karyawan.',
+  ].join(' '),
   parameters: {
     type: 'object',
     properties: {
       refs: { type: 'array', items: { type: 'string' }, description: 'Kode karyawan yang sudah muncul, misalnya ["KARYAWAN_1"].' },
-      filters: { type: 'array', description: 'Filter sama seperti query_workforce, misalnya [{"field":"age","operator":"gte","min":51}].', items: { type: 'object', properties: {
-        field: { type: 'string' },
-        operator: { type: 'string', enum: ['eq', 'contains', 'gte', 'lte', 'between'] },
-        value: { type: 'string' },
-        min: { type: 'number' },
-        max: { type: 'number' },
-      }, required: ['field', 'operator'] } },
+      filters: {
+        type: 'array',
+        description: 'Filter sama seperti query_workforce, misalnya [{"field":"age","operator":"gte","min":51}].',
+        items: {
+          type: 'object',
+          properties: {
+            field: { type: 'string' },
+            operator: { type: 'string', enum: ['eq', 'contains', 'gte', 'lte', 'between'] },
+            value: { type: 'string' },
+            min: { type: 'number' },
+            max: { type: 'number' },
+          },
+          required: ['field', 'operator'],
+        },
+      },
     },
   },
 } as const
 
 /** Runs list_employees: de-identified rows for the model, names stay in the IdentityMap. */
 export function listEmployees(input: unknown, records: EmployeeRecord[], asOf: string, identities: IdentityMap) {
-  const args = typeof input === 'object' && input !== null && !Array.isArray(input) ? input as Record<string, unknown> : {}
+  const args = typeof input === 'object' && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : {}
   let matched: EmployeeRecord[]
   if (Array.isArray(args.refs) && args.refs.length) {
-    matched = args.refs.filter((ref): ref is string => typeof ref === 'string').map(ref => identities.recordFor(ref)).filter((record): record is EmployeeRecord => Boolean(record))
+    matched = args.refs
+      .filter((ref): ref is string => typeof ref === 'string')
+      .map(ref => identities.recordFor(ref))
+      .filter((record): record is EmployeeRecord => Boolean(record))
   } else {
     const filters = validFilters(args.filters ?? [])
     if (!filters) return { error: 'Parameter filter tidak valid. Gunakan field dan operator yang sama seperti query_workforce.' }

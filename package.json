@@ -12,7 +12,9 @@
     "build:function": "esbuild server/vercelChat.ts --bundle --platform=node --format=esm --target=node24 --outfile=api/chat.mjs",
     "test": "vitest run",
     "lint": "oxlint --ignore-pattern api/chat.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@fontsource/poppins": "^5.3.0",
@@ -34,6 +36,7 @@
     "concurrently": "^10.0.5",
     "esbuild": "^0.28.2",
     "oxlint": "^1.81.0",
+    "prettier": "3.9.9",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",

@@ -1,16 +1,9 @@
 import source from './snapshot-2026-07.json'
 import type { EmployeeSnapshot } from '../types/workforce'
 
-export interface WorkforceRepository {
-  listPeriods(): Promise<string[]>
-  getSnapshot(period: string): Promise<EmployeeSnapshot | null>
-}
-
 const snapshot = source as EmployeeSnapshot
 
-export const localRepository: WorkforceRepository = {
-  async listPeriods() { return [snapshot.period] },
-  async getSnapshot(period) { return period === snapshot.period ? snapshot : null },
+/** The bundled July 2026 sample used by the tests. */
+export function getPrototypeSnapshot(): EmployeeSnapshot {
+  return snapshot
 }
-
-export function getPrototypeSnapshot(): EmployeeSnapshot { return snapshot }

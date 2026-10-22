@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { getPrototypeSnapshot } from '../data/repository'
 import type { EmployeeRecord } from '../types/workforce'
-import { hasContractColumn, projectContracts, shiftMonth } from './contracts'
+import { hasContractColumn, projectContracts } from './contracts'
+import { shiftMonth } from './periods'
 
 const base = getPrototypeSnapshot().records[0]
-const person = (nip: string, status: string, contractEnd: string | null, division = 'DIV A'): EmployeeRecord => ({ ...base, nip, name: nip, status, contractEnd, division })
+const person = (nip: string, status: string, contractEnd: string | null, division = 'DIV A'): EmployeeRecord => ({
+  ...base,
+  nip,
+  name: nip,
+  status,
+  contractEnd,
+  division,
+})
 
 describe('projectContracts', () => {
   const records = [

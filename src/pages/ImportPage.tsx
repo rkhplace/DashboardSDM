@@ -25,8 +25,8 @@ export function ImportPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const asOf = lastDayOfMonth(period)
-  const quality = useMemo(() => pending && asOf ? validateInspection(pending.inspection, asOf) : null, [pending, asOf])
-  const notes = useMemo(() => pending && asOf ? importNotes(pending.inspection, period, history) : [], [pending, asOf, period, history])
+  const quality = useMemo(() => (pending && asOf ? validateInspection(pending.inspection, asOf) : null), [pending, asOf])
+  const notes = useMemo(() => (pending && asOf ? importNotes(pending.inspection, period, history) : []), [pending, asOf, period, history])
 
   async function finish() {
     if (!pending || !asOf || !quality || quality.critical.length) return
@@ -61,9 +61,17 @@ export function ImportPage() {
     for (const [index, file] of excel.entries()) {
       try {
         const inspection = await inspectExcel(file)
-        setBatch(current => current?.map(item => item.id === items[index].id ? { ...item, inspection, period: inspection.period ?? '' } : item) ?? null)
+        setBatch(
+          current =>
+            current?.map(item => (item.id === items[index].id ? { ...item, inspection, period: inspection.period ?? '' } : item)) ?? null,
+        )
       } catch (cause) {
-        setBatch(current => current?.map(item => item.id === items[index].id ? { ...item, error: cause instanceof Error ? cause.message : 'File tidak dapat dibaca.' } : item) ?? null)
+        setBatch(
+          current =>
+            current?.map(item =>
+              item.id === items[index].id ? { ...item, error: cause instanceof Error ? cause.message : 'File tidak dapat dibaca.' } : item,
+            ) ?? null,
+        )
       }
     }
     setReading(false)
@@ -85,9 +93,16 @@ export function ImportPage() {
   async function saveBatch(ready: ReviewedItem[]) {
     setError('')
     setSaving(`Menyimpan ${ready.length} periode...`)
-    const snapshots = ready.map(item => ({ period: item.period, asOf: item.asOf!, sourceFile: item.filename, records: item.inspection!.records }))
+    const snapshots = ready.map(item => ({
+      period: item.period,
+      asOf: item.asOf!,
+      sourceFile: item.filename,
+      records: item.inspection!.records,
+    }))
     const { saved, failed } = await savePeriods(snapshots)
-    const latest = snapshots.filter(item => saved.includes(item.period)).sort((a, b) => b.period.localeCompare(a.period))[0] ?? snapshots.sort((a, b) => b.period.localeCompare(a.period))[0]
+    const latest =
+      snapshots.filter(item => saved.includes(item.period)).sort((a, b) => b.period.localeCompare(a.period))[0] ??
+      snapshots.sort((a, b) => b.period.localeCompare(a.period))[0]
     try {
       setSaving('Membuka dashboard...')
       const sessionId = await createSession(latest)
@@ -114,7 +129,11 @@ export function ImportPage() {
 
   async function remove(target: string) {
     setError('')
-    try { await removePeriod(target) } catch { setError('Periode gagal dihapus dari penyimpanan browser.') }
+    try {
+      await removePeriod(target)
+    } catch {
+      setError('Periode gagal dihapus dari penyimpanan browser.')
+    }
   }
 
   function drop(event: DragEvent<HTMLElement>) {
@@ -123,36 +142,118 @@ export function ImportPage() {
     if (!loading) void upload(event.dataTransfer.files)
   }
 
-  function reset() { setPending(null); setBatch(null); setPeriod(''); setError(''); setSaving(null) }
+  function reset() {
+    setPending(null)
+    setBatch(null)
+    setPeriod('')
+    setError('')
+    setSaving(null)
+  }
 
-  return <div className="landing-page">
-    <div className={`landing-content ${pending || batch || periods.length ? 'landing-content-wide' : ''}`}>
-      <div className="landing-brand"><img src="/logo-inti.png" alt="Logo PT INTI" /><span>PT INTI (Persero)</span></div>
-      <h1>Dashboard SDM</h1>
-      <p className="landing-subtitle">{pending || batch ? 'Periksa hasil pembacaan file sebelum disimpan' : 'Upload data karyawan per periode untuk memulai'}</p>
-      {batch
-        ? <BatchImportPanel items={batch} stored={history} reading={reading} saving={saving}
-          onPeriodChange={(id, value) => setBatch(current => current?.map(item => item.id === id ? { ...item, period: value } : item) ?? null)}
-          onRemove={id => setBatch(current => { const next = current?.filter(item => item.id !== id) ?? []; return next.length ? next : null })}
-          onSave={ready => { void saveBatch(ready) }} onReset={reset}/>
-        : pending
-          ? <DataQualityPanel inspection={pending.inspection} filename={pending.filename} period={period} onPeriodChange={setPeriod} quality={quality} loading={loading} notes={notes} onContinue={() => { void finish() }} onReset={reset}/>
-          : <>
-            <section className={`landing-upload ${dragging ? 'is-dragging' : ''}`} aria-label="Upload file data karyawan" onDragOver={event => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={drop}>
-              <div className="landing-upload-icon"><FileSpreadsheet size={28} strokeWidth={1.7}/></div>
+  return (
+    <div className="landing-page">
+      <div className={`landing-content ${pending || batch || periods.length ? 'landing-content-wide' : ''}`}>
+        <div className="landing-brand">
+          <img src="/logo-inti.png" alt="Logo PT INTI" />
+          <span>PT INTI (Persero)</span>
+        </div>
+        <h1>Dashboard SDM</h1>
+        <p className="landing-subtitle">
+          {pending || batch ? 'Periksa hasil pembacaan file sebelum disimpan' : 'Upload data karyawan per periode untuk memulai'}
+        </p>
+        {batch ? (
+          <BatchImportPanel
+            items={batch}
+            stored={history}
+            reading={reading}
+            saving={saving}
+            onPeriodChange={(id, value) =>
+              setBatch(current => current?.map(item => (item.id === id ? { ...item, period: value } : item)) ?? null)
+            }
+            onRemove={id =>
+              setBatch(current => {
+                const next = current?.filter(item => item.id !== id) ?? []
+                return next.length ? next : null
+              })
+            }
+            onSave={ready => {
+              void saveBatch(ready)
+            }}
+            onReset={reset}
+          />
+        ) : pending ? (
+          <DataQualityPanel
+            inspection={pending.inspection}
+            filename={pending.filename}
+            period={period}
+            onPeriodChange={setPeriod}
+            quality={quality}
+            loading={loading}
+            notes={notes}
+            onContinue={() => {
+              void finish()
+            }}
+            onReset={reset}
+          />
+        ) : (
+          <>
+            <section
+              className={`landing-upload ${dragging ? 'is-dragging' : ''}`}
+              aria-label="Upload file data karyawan"
+              onDragOver={event => {
+                event.preventDefault()
+                setDragging(true)
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={drop}
+            >
+              <div className="landing-upload-icon">
+                <FileSpreadsheet size={28} strokeWidth={1.7} />
+              </div>
               <h2>Upload File Data Karyawan</h2>
-              <p>Format <strong>.xlsx</strong> · satu file untuk satu periode (bulan). Pilih atau seret <strong>beberapa file sekaligus</strong> untuk banyak periode.</p>
+              <p>
+                Format <strong>.xlsx</strong> · satu file untuk satu periode (bulan). Pilih atau seret{' '}
+                <strong>beberapa file sekaligus</strong> untuk banyak periode.
+              </p>
               <label className={`landing-file-button ${loading ? 'is-loading' : ''}`}>
-                <UploadCloud size={17}/>{loading ? 'Membaca file...' : 'Pilih File'}
-                <input type="file" accept=".xlsx" multiple disabled={loading} onChange={event => { void upload(event.target.files); event.target.value = '' }} />
+                <UploadCloud size={17} />
+                {loading ? 'Membaca file...' : 'Pilih File'}
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  multiple
+                  disabled={loading}
+                  onChange={event => {
+                    void upload(event.target.files)
+                    event.target.value = ''
+                  }}
+                />
               </label>
             </section>
-            <SavedPeriods periods={periods} storage={storage} busy={loading} onOpen={target => { void open(target) }} onRemove={target => { void remove(target) }}/>
-          </>}
-      {error && <p className="landing-error" role="alert">{error}</p>}
-      <p className="landing-footnote">{storage === 'unavailable'
-        ? 'Browser ini tidak mengizinkan penyimpanan lokal; data hanya dipakai selama halaman terbuka.'
-        : 'File dibaca di browser. Setiap periode disimpan di browser perangkat ini, bukan di database server, agar bisa dibandingkan antar-periode.'}</p>
+            <SavedPeriods
+              periods={periods}
+              storage={storage}
+              busy={loading}
+              onOpen={target => {
+                void open(target)
+              }}
+              onRemove={target => {
+                void remove(target)
+              }}
+            />
+          </>
+        )}
+        {error && (
+          <p className="landing-error" role="alert">
+            {error}
+          </p>
+        )}
+        <p className="landing-footnote">
+          {storage === 'unavailable'
+            ? 'Browser ini tidak mengizinkan penyimpanan lokal; data hanya dipakai selama halaman terbuka.'
+            : 'File dibaca di browser. Setiap periode disimpan di browser perangkat ini, bukan di database server, agar bisa dibandingkan antar-periode.'}
+        </p>
+      </div>
     </div>
-  </div>
+  )
 }

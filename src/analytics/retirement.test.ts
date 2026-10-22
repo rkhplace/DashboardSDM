@@ -4,7 +4,16 @@ import type { EmployeeRecord } from '../types/workforce'
 import { addYears, defaultRetirementStatuses, projectRetirement, retirementDate } from './retirement'
 
 const base = getPrototypeSnapshot().records[0]
-const person = (nip: string, birthDate: string | null, extra: Partial<EmployeeRecord> = {}): EmployeeRecord => ({ ...base, nip, name: nip, status: 'Aktif', division: 'DIV A', positionType: null, birthDate, ...extra })
+const person = (nip: string, birthDate: string | null, extra: Partial<EmployeeRecord> = {}): EmployeeRecord => ({
+  ...base,
+  nip,
+  name: nip,
+  status: 'Aktif',
+  division: 'DIV A',
+  positionType: null,
+  birthDate,
+  ...extra,
+})
 
 describe('retirement projection', () => {
   it('computes retirement dates including leap days', () => {

@@ -22,7 +22,10 @@ export function rateLimited(key: string, now = Date.now()): boolean {
     if (hits.size > MAX_TRACKED_CLIENTS) hits.clear()
   }
   const entry = hits.get(key)
-  if (!entry || entry.resetAt <= now) { hits.set(key, { count: 1, resetAt: now + WINDOW_MS }); return false }
+  if (!entry || entry.resetAt <= now) {
+    hits.set(key, { count: 1, resetAt: now + WINDOW_MS })
+    return false
+  }
   entry.count++
   return entry.count > MAX_REQUESTS
 }
@@ -31,11 +34,18 @@ function allowedOrigin(request: IncomingMessage): boolean {
   const origin = request.headers.origin
   // Browsers always send Origin on a POST; a request without one is a script, not the dashboard.
   if (!origin) return false
-  const extra = (process.env.CHAT_ALLOWED_ORIGINS ?? '').split(',').map(item => item.trim()).filter(Boolean)
+  const extra = (process.env.CHAT_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
   if (extra.includes(origin)) return true
   const forwardedHost = request.headers['x-forwarded-host']
   const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) ?? request.headers.host
-  try { return new URL(origin).host === host } catch { return false }
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
 }
 
 function json(response: ServerResponse, status: number, body: unknown) {
@@ -68,10 +78,20 @@ export default async function handler(request: RequestWithBody, response: Server
   } catch (error) {
     if (error instanceof SyntaxError) return json(response, 400, { code: 'INVALID_JSON', message: 'JSON tidak valid.' })
     // Vercel's own body parser reports bad JSON with statusCode instead of status.
-    if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 400) return json(response, 400, { code: 'INVALID_JSON', message: 'JSON tidak valid.' })
-    if (error instanceof Error && error.name === 'TimeoutError') return json(response, 504, { code: 'AI_TIMEOUT', message: 'Gemini terlalu lama merespons.' })
-    if (error && typeof error === 'object' && 'status' in error && 'code' in error && 'message' in error
-      && typeof error.status === 'number' && typeof error.code === 'string' && typeof error.message === 'string') {
+    if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 400)
+      return json(response, 400, { code: 'INVALID_JSON', message: 'JSON tidak valid.' })
+    if (error instanceof Error && error.name === 'TimeoutError')
+      return json(response, 504, { code: 'AI_TIMEOUT', message: 'Gemini terlalu lama merespons.' })
+    if (
+      error &&
+      typeof error === 'object' &&
+      'status' in error &&
+      'code' in error &&
+      'message' in error &&
+      typeof error.status === 'number' &&
+      typeof error.code === 'string' &&
+      typeof error.message === 'string'
+    ) {
       return json(response, error.status, { code: error.code, message: error.message })
     }
     console.error('Chat function failed', error instanceof Error ? error.name : typeof error)

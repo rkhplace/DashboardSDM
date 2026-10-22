@@ -13,14 +13,19 @@ describe('chat extras', () => {
     expect(chart.unit).toBe('orang')
     expect(chart.data[0]).toEqual({ label: 'Aktif', value: 52 })
     expect(chart.data.length).toBeLessThanOrEqual(15)
-    const average = chartFromQuery(queryWorkforce({ operation: 'average', field: 'age', groupBy: ['directorate'] }, snapshot.records, snapshot.asOf))!
+    const average = chartFromQuery(
+      queryWorkforce({ operation: 'average', field: 'age', groupBy: ['directorate'] }, snapshot.records, snapshot.asOf),
+    )!
     expect(average.title).toBe('Rata-rata usia per direktorat')
     expect(average.unit).toBe('tahun')
     expect(chartFromQuery(queryWorkforce({ operation: 'count' }, snapshot.records, snapshot.asOf))).toBeNull()
   })
 
   it('maps suggested filters onto categories present in the file', () => {
-    const result = resolveFilterSuggestion({ status: ['pkwt umum', 'Tidak ada'], gender: ['Perempuan'], ageGroup: ['26-30'] }, snapshot.records)
+    const result = resolveFilterSuggestion(
+      { status: ['pkwt umum', 'Tidak ada'], gender: ['Perempuan'], ageGroup: ['26-30'] },
+      snapshot.records,
+    )
     expect('filters' in result && result.filters).toMatchObject({ status: ['PKWT Umum'], gender: ['P'], ageGroup: ['26–30'], division: [] })
     expect('rejected' in result && result.rejected).toEqual(['status: Tidak ada'])
     expect(resolveFilterSuggestion({ division: ['DIVISI FIKTIF'] }, snapshot.records)).toHaveProperty('error')

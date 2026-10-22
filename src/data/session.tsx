@@ -7,14 +7,20 @@ import { snapshotStore as defaultStore, type SnapshotStore, type StoredPeriod } 
 const LAST_PERIOD_KEY = 'dashboard-sdm:last-period'
 
 function readLastPeriod(): string | null {
-  try { return localStorage.getItem(LAST_PERIOD_KEY) } catch { return null }
+  try {
+    return localStorage.getItem(LAST_PERIOD_KEY)
+  } catch {
+    return null
+  }
 }
 
 function writeLastPeriod(period: string | null) {
   try {
     if (period) localStorage.setItem(LAST_PERIOD_KEY, period)
     else localStorage.removeItem(LAST_PERIOD_KEY)
-  } catch { /* Only a convenience: the dashboard still works without it. */ }
+  } catch {
+    /* Only a convenience: the dashboard still works without it. */
+  }
 }
 
 let persistenceAsked = false
@@ -25,7 +31,11 @@ let persistenceAsked = false
 function requestPersistence() {
   if (persistenceAsked) return
   persistenceAsked = true
-  try { void navigator.storage?.persist?.().catch(() => undefined) } catch { /* Not supported: storage stays best-effort. */ }
+  try {
+    void navigator.storage?.persist?.().catch(() => undefined)
+  } catch {
+    /* Not supported: storage stays best-effort. */
+  }
 }
 
 export function WorkforceSessionProvider({ children, store = defaultStore }: { children: ReactNode; store?: SnapshotStore }) {
@@ -59,11 +69,14 @@ export function WorkforceSessionProvider({ children, store = defaultStore }: { c
     return nextHistory
   }, [store])
 
-  const open = useCallback(async (target: EmployeeSnapshot) => {
-    const id = await createSession(target)
-    activate(target, id)
-    writeLastPeriod(target.period)
-  }, [activate])
+  const open = useCallback(
+    async (target: EmployeeSnapshot) => {
+      const id = await createSession(target)
+      activate(target, id)
+      writeLastPeriod(target.period)
+    },
+    [activate],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -77,51 +90,96 @@ export function WorkforceSessionProvider({ children, store = defaultStore }: { c
         const target = last ? snapshots.find(item => item.period === last) : undefined
         if (target) await open(target).catch(() => writeLastPeriod(null))
       })
-      .catch(() => { if (!cancelled) setStorage('unavailable') })
-      .finally(() => { if (!cancelled) setRestoring(false) })
-    return () => { cancelled = true }
+      .catch(() => {
+        if (!cancelled) setStorage('unavailable')
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [store, open])
 
-  const savePeriod = useCallback(async (next: EmployeeSnapshot) => {
-    if (storage === 'unavailable') return false
-    try {
-      await store.save(next)
+  const savePeriod = useCallback(
+    async (next: EmployeeSnapshot) => {
+      if (storage === 'unavailable') return false
+      try {
+        await store.save(next)
+        await refresh()
+        writeLastPeriod(next.period)
+        requestPersistence()
+        return true
+      } catch {
+        return false
+      }
+    },
+    [store, refresh, storage],
+  )
+
+  const savePeriods = useCallback(
+    async (snapshots: EmployeeSnapshot[]) => {
+      const saved: string[] = []
+      const failed: string[] = []
+      for (const item of snapshots) {
+        if (storage === 'unavailable') {
+          failed.push(item.period)
+          continue
+        }
+        try {
+          await store.save(item)
+          saved.push(item.period)
+        } catch {
+          failed.push(item.period)
+        }
+      }
+      if (saved.length) {
+        await refresh().catch(() => undefined)
+        // Reopen the newest saved period after a reload, like a single upload does.
+        writeLastPeriod([...saved].sort().at(-1)!)
+        requestPersistence()
+      }
+      return { saved, failed }
+    },
+    [store, refresh, storage],
+  )
+
+  const openPeriod = useCallback(
+    async (period: string) => {
+      const target = history.find(item => item.period === period) ?? (await store.get(period))
+      if (!target) throw new Error(`Periode ${period} tidak ditemukan di penyimpanan.`)
+      await open(target)
+    },
+    [history, store, open],
+  )
+
+  const removePeriod = useCallback(
+    async (period: string) => {
+      await store.remove(period)
       await refresh()
-      writeLastPeriod(next.period)
-      requestPersistence()
-      return true
-    } catch {
-      return false
-    }
-  }, [store, refresh, storage])
+      if (readLastPeriod() === period) writeLastPeriod(null)
+    },
+    [store, refresh],
+  )
 
-  const savePeriods = useCallback(async (snapshots: EmployeeSnapshot[]) => {
-    const saved: string[] = []
-    const failed: string[] = []
-    for (const item of snapshots) {
-      if (storage === 'unavailable') { failed.push(item.period); continue }
-      try { await store.save(item); saved.push(item.period) } catch { failed.push(item.period) }
-    }
-    if (saved.length) {
-      await refresh().catch(() => undefined)
-      // Reopen the newest saved period after a reload, like a single upload does.
-      writeLastPeriod([...saved].sort().at(-1)!)
-      requestPersistence()
-    }
-    return { saved, failed }
-  }, [store, refresh, storage])
-
-  const openPeriod = useCallback(async (period: string) => {
-    const target = history.find(item => item.period === period) ?? await store.get(period)
-    if (!target) throw new Error(`Periode ${period} tidak ditemukan di penyimpanan.`)
-    await open(target)
-  }, [history, store, open])
-
-  const removePeriod = useCallback(async (period: string) => {
-    await store.remove(period)
-    await refresh()
-    if (readLastPeriod() === period) writeLastPeriod(null)
-  }, [store, refresh])
-
-  return <SessionContext.Provider value={{ snapshot, sessionId, activate, clear, periods, history, storage, restoring, savePeriod, savePeriods, openPeriod, removePeriod }}>{children}</SessionContext.Provider>
+  return (
+    <SessionContext.Provider
+      value={{
+        snapshot,
+        sessionId,
+        activate,
+        clear,
+        periods,
+        history,
+        storage,
+        restoring,
+        savePeriod,
+        savePeriods,
+        openPeriod,
+        removePeriod,
+      }}
+    >
+      {children}
+    </SessionContext.Provider>
+  )
 }

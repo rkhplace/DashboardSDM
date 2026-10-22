@@ -1,6 +1,14 @@
 import type { Report, ReportTable } from './reportData'
 
-type XlsxCell = { value?: string | number | null; type?: typeof String | typeof Number; fontWeight?: 'bold'; format?: string; backgroundColor?: string; color?: string; wrap?: boolean } | null
+type XlsxCell = {
+  value?: string | number | null
+  type?: typeof String | typeof Number
+  fontWeight?: 'bold'
+  format?: string
+  backgroundColor?: string
+  color?: string
+  wrap?: boolean
+} | null
 type XlsxRow = XlsxCell[]
 
 const header = (value: string): XlsxCell => ({ value, fontWeight: 'bold', backgroundColor: '#173B68', color: '#FFFFFF' })
@@ -17,10 +25,12 @@ function tableRows(table: ReportTable, withTitle = false): XlsxRow[] {
   rows.push(table.headers.map(header))
   for (const row of table.rows) {
     const isTotal = row[0] === 'Total'
-    rows.push(row.map((value, index) => {
-      const next = cell(value, index === table.percentColumn)
-      return next && isTotal ? { ...next, fontWeight: 'bold' } : next
-    }))
+    rows.push(
+      row.map((value, index) => {
+        const next = cell(value, index === table.percentColumn)
+        return next && isTotal ? { ...next, fontWeight: 'bold' } : next
+      }),
+    )
   }
   if (table.note) rows.push([{ value: table.note, type: String }])
   return rows
@@ -40,34 +50,70 @@ function sheet(name: string, data: XlsxRow[], sticky = 1) {
 export async function exportExcel(report: Report, filename: string) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser')
   const summary: XlsxRow[] = [
-    [{ value: report.title, fontWeight: 'bold' }], [],
-    ...report.meta.map(([key, value]): XlsxRow => [{ value: key, fontWeight: 'bold' }, { value, type: String }]), [],
+    [{ value: report.title, fontWeight: 'bold' }],
+    [],
+    ...report.meta.map(([key, value]): XlsxRow => [
+      { value: key, fontWeight: 'bold' },
+      { value, type: String },
+    ]),
+    [],
     [header('Indikator'), header('Nilai')],
-    ...report.kpis.map(([key, value]): XlsxRow => [{ value: key, type: String }, { value, type: String }]),
+    ...report.kpis.map(([key, value]): XlsxRow => [
+      { value: key, type: String },
+      { value, type: String },
+    ]),
   ]
   const composition = report.compositions.flatMap((table, index) => [...(index ? [[] as XlsxRow] : []), ...tableRows(table, true)])
   const retirement: XlsxRow[] = [
-    ...report.retirement.settings.map(([key, value]): XlsxRow => [{ value: key, fontWeight: 'bold' }, { value, type: String }]), [],
-    ...tableRows(report.retirement.windows, true), [],
+    ...report.retirement.settings.map(([key, value]): XlsxRow => [
+      { value: key, fontWeight: 'bold' },
+      { value, type: String },
+    ]),
+    [],
+    ...tableRows(report.retirement.windows, true),
+    [],
     ...tableRows(report.retirement.divisions, true),
   ]
-  const pairs = (items: [string, string][]): XlsxRow[] => items.map(([key, value]): XlsxRow => [{ value: key, fontWeight: 'bold' }, { value, type: String }])
+  const pairs = (items: [string, string][]): XlsxRow[] =>
+    items.map(([key, value]): XlsxRow => [
+      { value: key, fontWeight: 'bold' },
+      { value, type: String },
+    ])
   const { contracts, trend } = report
   const sheets = [
     { ...sheet('Ringkasan', summary, 0), columns: [{ width: 34 }, { width: 70 }] },
     sheet('Komposisi', composition, 0),
     sheet('Matriks band', tableRows(report.bandMatrix)),
-    ...(trend ? [
-      sheet('Tren antar-periode', [...pairs(trend.settings), ...(trend.settings.length ? [[] as XlsxRow] : []), ...tableRows(trend.periods, true)], 0),
-      sheet('Masuk & keluar', tableRows(trend.movements)),
-    ] : []),
+    ...(trend
+      ? [
+          sheet(
+            'Tren antar-periode',
+            [...pairs(trend.settings), ...(trend.settings.length ? [[] as XlsxRow] : []), ...tableRows(trend.periods, true)],
+            0,
+          ),
+          sheet('Masuk & keluar', tableRows(trend.movements)),
+        ]
+      : []),
     sheet('Proyeksi pensiun', retirement, 0),
     sheet('Daftar pensiun', tableRows(report.retirement.candidates)),
-    ...(contracts ? [
-      sheet('Kontrak PKWT', [...pairs(contracts.settings), ...(contracts.followUpNote ? [[{ value: contracts.followUpNote, type: String }] as XlsxRow] : []), [], ...tableRows(contracts.months, true), [], ...tableRows(contracts.divisions, true)], 0),
-      sheet('Daftar kontrak', tableRows(contracts.list)),
-      ...(contracts.followUp ? [sheet('Tindak lanjut kontrak', tableRows(contracts.followUp))] : []),
-    ] : []),
+    ...(contracts
+      ? [
+          sheet(
+            'Kontrak PKWT',
+            [
+              ...pairs(contracts.settings),
+              ...(contracts.followUpNote ? [[{ value: contracts.followUpNote, type: String }] as XlsxRow] : []),
+              [],
+              ...tableRows(contracts.months, true),
+              [],
+              ...tableRows(contracts.divisions, true),
+            ],
+            0,
+          ),
+          sheet('Daftar kontrak', tableRows(contracts.list)),
+          ...(contracts.followUp ? [sheet('Tindak lanjut kontrak', tableRows(contracts.followUp))] : []),
+        ]
+      : []),
     sheet('Daftar karyawan', tableRows(report.employees)),
   ]
   await writeXlsxFile(sheets as never, { fontFamily: 'Calibri', fontSize: 11 }).toFile(filename)

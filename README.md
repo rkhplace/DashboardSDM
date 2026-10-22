@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` menyalakan Vite dan API lokal pada `127.0.0.1:8787`. File `.env` sudah disiapkan; isi `GEMINI_API_KEY` dengan key dari Google AI Studio untuk mencoba chatbot, lalu mulai ulang server. File `.env` diabaikan oleh Git. Tanpa key, upload dan dashboard tetap berjalan, tetapi chatbot menampilkan pesan konfigurasi saat ditanya. Model awal adalah `gemini-3.1-flash-lite` dan dapat diganti melalui `GEMINI_MODEL`. Bila Google membalas sibuk (HTTP 5xx), backend mencoba ulang dua kali dengan jeda bertambah lalu beralih ke `GEMINI_FALLBACK_MODEL` (contoh: `gemini-3.5-flash-lite`) bila diatur; isi variabel yang sama di Vercel.
+`npm run dev` menyalakan Vite dan API lokal pada `127.0.0.1:8787`. File `.env` sudah disiapkan; isi `GEMINI_API_KEY` dengan key dari Google AI Studio untuk mencoba chatbot, lalu mulai ulang server. File `.env` diabaikan oleh Git. Tanpa key, upload dan dashboard tetap berjalan, tetapi chatbot menampilkan pesan konfigurasi saat ditanya. Model awal adalah `gemini-3.1-flash-lite` dan dapat diganti melalui `GEMINI_MODEL`. Bila Google membalas sibuk (HTTP 5xx), backend mencoba ulang dua kali dengan jeda bertambah lalu beralih ke `GEMINI_FALLBACK_MODEL` (contoh: `gemini-3.5-flash-lite`) bila diatur; isi variabel yang sama di Vercel. Backend meminta tingkat berpikir `low` (`GEMINI_THINKING_LEVEL`) karena tanpa pengaturan ini Gemini 3 berpikir di tingkat `high` yang membuat setiap jawaban lambat.
 
 ## Deploy di Vercel
 
@@ -25,7 +25,10 @@ Untuk verifikasi:
 npm test
 npm run build
 npm run lint
+npm run format:check
 ```
+
+Format kode diatur Prettier (`.prettierrc.json`: tanpa titik koma, kutip tunggal, lebar 140). Jalankan `npm run format` sebelum commit.
 
 ## Data prototipe
 
@@ -41,14 +44,14 @@ Chatbot juga bisa menjawab pertanyaan antarperiode, kontrak PKWT, dan kualitas d
 
 ## Struktur
 
-- `src/analytics`: fungsi murni untuk filter dan agregasi; seluruh KPI dan tabel menerima record yang sudah terfilter.
+- `src/analytics`: fungsi murni untuk filter dan agregasi; seluruh KPI dan tabel menerima record yang sudah terfilter. `format.ts` (angka, persen, tanggal) dan `periods.ts` (label dan selisih bulan) dipakai bersama oleh seluruh tampilan, laporan, dan backend.
 - `src/data`: adapter Excel, pemeriksaan kualitas, state sesi, penyimpanan periode (`snapshotStore.ts`), dan fixture snapshot untuk test.
 
 ## Penyimpanan periode dan integrasi Portal HC
 
 Semua akses data periode lewat antarmuka `SnapshotStore` di `src/data/snapshotStore.ts` (`list`, `get`, `getAll`, `save`, `remove`). Implementasi saat ini memakai IndexedDB, jadi data hanya ada di browser perangkat yang meng-upload dan hilang bila data situs browser dihapus; file Excel asli tetap menjadi sumber cadangan. Saat akses Portal HC tersedia, buat implementasi `SnapshotStore` baru yang mengambil snapshot per periode dari API/database HC lalu ganti ekspor `snapshotStore`; analitik, dashboard, dan chatbot tidak perlu diubah. Karena data karyawan tersimpan di browser, gunakan aplikasi di perangkat kerja pribadi, bukan komputer bersama.
 - `src/types`: kontrak employee, snapshot, dan import batch.
-- `src/components`: filter, grafik, kartu, dan daftar karyawan.
+- `src/components`: bagian-bagian dashboard (KPI, status, tren beserta grafik dan tabel perpindahannya, pensiun, kontrak, matriks band, daftar karyawan, chatbot) serta komponen dasar seperti filter dan slider.
 - `src/pages`: halaman upload dan dashboard.
 - `src/ai` dan `server`: konteks agregat, sesi sementara, dan adapter Gemini untuk chatbot.
 

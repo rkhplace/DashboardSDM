@@ -18,7 +18,7 @@
 | TANGGAL LAHIR, TANGGAL MASUK | teks `dd.mm.yyyy`, lengkap dan valid | sumber usia dan masa kerja |
 | JENIS KELAMIN | kode 1/2, lengkap | sumber gender; 1=L, 2=P |
 | JENIS KELAMIN 1 | teks, lengkap | label pembanding |
-| PENDIDIKAN | kode 81/82/85/86/87/88/89; 1 kosong | sumber jenjang pendidikan |
+| PENDIDIKAN | kode resmi 80–90 (di dummy: 81/82/85/86/87/88/89); 1 kosong | sumber jenjang pendidikan |
 | SD, SLTP, SLTA, D2, D1, D3, D4, S1, S2, S3, TOTAL | bilangan 0/1 | indikator turunan; bukan sumber jenjang |
 | USIA, USIA 1 | angka dan label, lengkap | turunan, untuk validasi |
 | MASKER, MASKER 1 | angka dan label, lengkap | turunan masa kerja, untuk validasi |
@@ -39,7 +39,7 @@ Pemeriksaan kualitas awal: NIP duplikat 0, nama kosong 0, divisi kosong 0, statu
 2. KPI perempuan HTML memakai `total - laki`; gender yang tak dikenali akan salah terhitung sebagai perempuan. Mesin baru memiliki kategori tidak diketahui.
 3. Grup usia `<25` lalu `26–30` menghilangkan usia tepat 25. Grup baru `≤25`, `26–30`, dan seterusnya bersifat lengkap, plus tidak diketahui.
 4. Parser masa kerja HTML mengambil angka pertama dari label `MASKER 1`; `#N/A` hilang, dan label `5–10` direduksi menjadi 5. Mesin baru memakai tanggal masuk. Empat nilai `MASKER` lebih rendah satu tahun dari perhitungan pada 31 Juli 2026.
-5. Kode pendidikan 81 (SLTP) tidak ada di pemetaan HTML lama. Kode 82 tampak SLTA, 85 D3, 86 D4, 87 S1, 88 S2, 89 S3. Ada 8 baris ketika flag satu-hot tidak sejalan dengan kode dan 25 nilai `TOTAL=0`. Kode pendidikan dipakai sebagai sumber awal; flag/`TOTAL` hanya untuk pemeriksaan kualitas. Satu pendidikan kosong tetap “Tidak diketahui”.
+5. Kode pendidikan resmi dari HC (tabel SAP “Educ. est.”, dikonfirmasi Oktober 2026): 80 SD, 81 SLTP, 82 SLTA, 83 D1, 84 D2, 85 D3, 86 D4, 87 S1, 88 S2, 89 S3, 90 Pelatihan. Semua kode di file dummy termasuk daftar ini. Ada 8 baris ketika flag satu-hot tidak sejalan dengan kode dan 25 nilai `TOTAL=0`. Kode pendidikan dipakai sebagai sumber; kolom flag SD–S3 hanya untuk pemeriksaan kualitas (peringatan “Kode PENDIDIKAN tidak sejalan dengan kolom jenjang” saat upload). Satu pendidikan kosong tetap “Tidak diketahui”.
 6. Band kosong pada 107 baris, terutama kategori PKWT proyek/TKB/umum dan jabatan komisaris. Matriks band harus memiliki kolom “Tidak tersedia” supaya total cocok dengan headcount.
 7. Tidak tersedia snapshot sebelum/sesudah Juli 2026, nilai kinerja, remunerasi, riwayat perubahan, atau label exit/join per periode. Tren, retensi, flight risk, skor AI, dan prediksi: **data belum tersedia**.
 8. Ekspor HTML lama dapat membenamkan PII pegawai. Fitur itu tidak dibawa ke aplikasi baru.

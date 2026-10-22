@@ -1,8 +1,26 @@
 import type { EmployeeRecord, Gender, WorkforceFilters } from '../types/workforce'
 
+/** Official education codes from the HR system (SAP "Educ. est." table, confirmed by HC, Oct 2026). */
 export const EDUCATION: Record<number, string> = {
-  81: 'SLTP', 82: 'SLTA', 85: 'D3', 86: 'D4', 87: 'S1', 88: 'S2', 89: 'S3',
+  80: 'SD',
+  81: 'SLTP',
+  82: 'SLTA',
+  83: 'D1',
+  84: 'D2',
+  85: 'D3',
+  86: 'D4',
+  87: 'S1',
+  88: 'S2',
+  89: 'S3',
+  90: 'Pelatihan',
 }
+/** Education levels from lowest to highest, for ordering charts and tables. */
+export const EDUCATION_LEVELS = Object.keys(EDUCATION)
+  .map(Number)
+  .sort((a, b) => a - b)
+  .map(code => EDUCATION[code])
+/** Per-level flag columns some HR files carry next to PENDIDIKAN (1 = the employee's level). Training has no column. */
+export const EDUCATION_FLAG_COLUMNS = ['SD', 'SLTP', 'SLTA', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'] as const
 export const AGE_GROUPS = ['≤25', '26–30', '31–35', '36–40', '41–45', '46–50', '>50', 'Tidak diketahui'] as const
 export const TENURE_GROUPS = ['<5', '5–10', '11–15', '16–20', '21–25', '>25', 'Tidak diketahui'] as const
 
@@ -11,7 +29,7 @@ export function genderOf(record: Pick<EmployeeRecord, 'genderCode'>): Gender {
 }
 
 export function educationOf(record: Pick<EmployeeRecord, 'educationCode'>): string {
-  return record.educationCode == null ? 'Tidak diketahui' : EDUCATION[record.educationCode] ?? 'Kode tidak dikenal'
+  return record.educationCode == null ? 'Tidak diketahui' : (EDUCATION[record.educationCode] ?? 'Kode tidak dikenal')
 }
 
 export function fullYears(isoDate: string | null, asOf: string): number | null {
@@ -21,7 +39,11 @@ export function fullYears(isoDate: string | null, asOf: string): number | null {
   if (Number.isNaN(date.valueOf()) || Number.isNaN(reference.valueOf()) || date > reference) return null
   if (date.toISOString().slice(0, 10) !== isoDate || reference.toISOString().slice(0, 10) !== asOf) return null
   let years = reference.getUTCFullYear() - date.getUTCFullYear()
-  if (reference.getUTCMonth() < date.getUTCMonth() || (reference.getUTCMonth() === date.getUTCMonth() && reference.getUTCDate() < date.getUTCDate())) years--
+  if (
+    reference.getUTCMonth() < date.getUTCMonth() ||
+    (reference.getUTCMonth() === date.getUTCMonth() && reference.getUTCDate() < date.getUTCDate())
+  )
+    years--
   return years
 }
 
@@ -59,14 +81,16 @@ export function filterRecords(records: EmployeeRecord[], filters: WorkforceFilte
   const includes = (selected: string[], value: string) => selected.length === 0 || selected.includes(value)
   return records.filter(record => {
     const age = fullYears(record.birthDate, asOf)
-    return includes(filters.directorate, record.directorate)
-      && includes(filters.division, record.division || 'Tidak diketahui')
-      && includes(filters.status, record.status)
-      && (filters.gender.length === 0 || filters.gender.includes(genderOf(record)))
-      && includes(filters.band, record.band == null ? 'Tidak tersedia' : String(record.band))
-      && includes(filters.ageGroup, ageGroup(age))
-      && includes(filters.tenureGroup, tenureGroup(fullYears(record.joinDate, asOf)))
-      && includes(filters.education, educationOf(record))
+    return (
+      includes(filters.directorate, record.directorate) &&
+      includes(filters.division, record.division || 'Tidak diketahui') &&
+      includes(filters.status, record.status) &&
+      (filters.gender.length === 0 || filters.gender.includes(genderOf(record))) &&
+      includes(filters.band, record.band == null ? 'Tidak tersedia' : String(record.band)) &&
+      includes(filters.ageGroup, ageGroup(age)) &&
+      includes(filters.tenureGroup, tenureGroup(fullYears(record.joinDate, asOf))) &&
+      includes(filters.education, educationOf(record))
+    )
   })
 }
 
@@ -86,8 +110,22 @@ export function summarize(records: EmployeeRecord[], asOf: string) {
 }
 
 export function bandMatrix(records: EmployeeRecord[]) {
-  const bands = [...new Set(records.map(record => record.band == null ? 'Tidak tersedia' : String(record.band)))].sort((a, b) => a === 'Tidak tersedia' ? 1 : b === 'Tidak tersedia' ? -1 : Number(a) - Number(b))
+  const bands = [...new Set(records.map(record => (record.band == null ? 'Tidak tersedia' : String(record.band))))].sort((a, b) =>
+    a === 'Tidak tersedia' ? 1 : b === 'Tidak tersedia' ? -1 : Number(a) - Number(b),
+  )
   const divisions = [...new Set(records.map(record => record.division))].sort()
-  const rows = divisions.map(division => ({ division, counts: bands.map(band => records.filter(record => record.division === division && (record.band == null ? 'Tidak tersedia' : String(record.band)) === band).length), total: records.filter(record => record.division === division).length }))
-  return { bands, rows, totals: bands.map(band => records.filter(record => (record.band == null ? 'Tidak tersedia' : String(record.band)) === band).length) }
+  const rows = divisions.map(division => ({
+    division,
+    counts: bands.map(
+      band =>
+        records.filter(record => record.division === division && (record.band == null ? 'Tidak tersedia' : String(record.band)) === band)
+          .length,
+    ),
+    total: records.filter(record => record.division === division).length,
+  }))
+  return {
+    bands,
+    rows,
+    totals: bands.map(band => records.filter(record => (record.band == null ? 'Tidak tersedia' : String(record.band)) === band).length),
+  }
 }
