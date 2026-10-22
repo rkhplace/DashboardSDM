@@ -26,6 +26,8 @@ export interface EmployeeRecord {
   educationCode: number | null
   joinDate: string | null
   sourceTotal: number | null
+  /** Levels whose flag column (SD … S3) is filled for this employee; absent when the file has no such columns. */
+  educationFlags?: string[]
   /** End date of a fixed-term (PKWT) contract, ISO yyyy-mm-dd. Absent in snapshots saved before the column existed. */
   contractEnd?: string | null
 }
@@ -35,15 +37,6 @@ export interface EmployeeSnapshot {
   asOf: string
   sourceFile: string
   records: EmployeeRecord[]
-}
-
-export interface ImportBatch {
-  batchId: string
-  period: string
-  filename: string
-  uploadedAt: string
-  rowCount: number
-  validationStatus: 'pending' | 'valid' | 'warning' | 'error'
 }
 
 export interface WorkforceFilters {
@@ -58,7 +51,14 @@ export interface WorkforceFilters {
 }
 
 export const emptyFilters: WorkforceFilters = {
-  directorate: [], division: [], status: [], gender: [], band: [], ageGroup: [], tenureGroup: [], education: [],
+  directorate: [],
+  division: [],
+  status: [],
+  gender: [],
+  band: [],
+  ageGroup: [],
+  tenureGroup: [],
+  education: [],
 }
 
 /** Small bar chart the chatbot attaches to an answer, built from query_workforce output. */

@@ -3,7 +3,12 @@ import { getPrototypeSnapshot } from './repository'
 import { decodeHistory, encodeHistory, fitHistory } from './historyPayload'
 
 const july = getPrototypeSnapshot()
-const june = { ...july, period: '2026-06', asOf: '2026-06-30', records: july.records.slice(0, 50).map((record, index) => index === 0 ? { ...record, nip: 'GONE-1', name: 'Pegawai Lama' } : record) }
+const june = {
+  ...july,
+  period: '2026-06',
+  asOf: '2026-06-30',
+  records: july.records.slice(0, 50).map((record, index) => (index === 0 ? { ...record, nip: 'GONE-1', name: 'Pegawai Lama' } : record)),
+}
 const august = { ...july, period: '2026-08', asOf: '2026-08-31', records: july.records.slice(1) }
 
 describe('period history payload', () => {
@@ -16,7 +21,12 @@ describe('period history payload', () => {
     expect(text).not.toContain(july.records[5].name) // still in August, resolved on the server
     const decoded = decodeHistory(JSON.parse(text), august)!
     expect(decoded.map(item => item.records.length)).toEqual([50, july.records.length])
-    expect(decoded[1].records[5]).toMatchObject({ nip: july.records[5].nip, name: july.records[5].name, division: july.records[5].division, birthDate: july.records[5].birthDate })
+    expect(decoded[1].records[5]).toMatchObject({
+      nip: july.records[5].nip,
+      name: july.records[5].name,
+      division: july.records[5].division,
+      birthDate: july.records[5].birthDate,
+    })
   })
 
   it('rejects malformed payloads and periods that are not earlier than the active one', () => {

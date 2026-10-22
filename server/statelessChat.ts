@@ -14,16 +14,31 @@ const MAX_TURN_TEXT = 20000
 
 function validateHistory(value: unknown): Turn[] {
   if (value === undefined) return []
-  if (!Array.isArray(value) || value.length > MAX_HISTORY_TURNS || value.some(turn => !object(turn) || !['user', 'assistant'].includes(String(turn.role)) || typeof turn.text !== 'string' || turn.text.length > MAX_TURN_TEXT)) {
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_HISTORY_TURNS ||
+    value.some(
+      turn =>
+        !object(turn) ||
+        !['user', 'assistant'].includes(String(turn.role)) ||
+        typeof turn.text !== 'string' ||
+        turn.text.length > MAX_TURN_TEXT,
+    )
+  ) {
     throw new ServiceError(400, 'INVALID_HISTORY', 'Riwayat percakapan tidak valid.')
   }
   return value.slice(-8).map(turn => ({ role: turn.role, text: turn.text }) as Turn)
 }
 
 export async function answerStatelessChat(input: unknown, generate: Generate = askGemini) {
-  if (!object(input) || typeof input.message !== 'string' || !input.message.trim() || input.message.length > 500
-    || input.conversationId !== undefined && (typeof input.conversationId !== 'string' || input.conversationId.length > 100)
-    || input.query !== undefined && (typeof input.query !== 'string' || input.query.length > 100)) {
+  if (
+    !object(input) ||
+    typeof input.message !== 'string' ||
+    !input.message.trim() ||
+    input.message.length > 500 ||
+    (input.conversationId !== undefined && (typeof input.conversationId !== 'string' || input.conversationId.length > 100)) ||
+    (input.query !== undefined && (typeof input.query !== 'string' || input.query.length > 100))
+  ) {
     throw new ServiceError(400, 'INVALID_MESSAGE', 'Pesan harus berisi 1–500 karakter.')
   }
   const snapshot = validateSnapshot(input.snapshot)
@@ -34,6 +49,12 @@ export async function answerStatelessChat(input: unknown, generate: Generate = a
   const { prompt, tools, identities } = prepareTurn(snapshot, filters, search, message, turns, input)
   const reply = await generate(prompt, tools)
   const evidence = reply.evidence?.map(item => ({ ...item, period: snapshot.period })) ?? []
-  return { conversationId: input.conversationId || randomUUID(), answer: identities.restore(presentAnswer(reply.answer)), evidence, ...tools.extras(),
-    limitations: ['Jawaban mengikuti data periode dan filter aktif.'], generatedAt: new Date().toISOString() }
+  return {
+    conversationId: input.conversationId || randomUUID(),
+    answer: identities.restore(presentAnswer(reply.answer)),
+    evidence,
+    ...tools.extras(),
+    limitations: ['Jawaban mengikuti data periode dan filter aktif.'],
+    generatedAt: new Date().toISOString(),
+  }
 }

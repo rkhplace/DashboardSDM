@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { AGE_GROUPS, ageGroup, bandMatrix, countBy, educationOf, filterRecords, fullYears, genderOf, summarize, tenureGroup } from './workforce'
+import {
+  AGE_GROUPS,
+  ageGroup,
+  bandMatrix,
+  countBy,
+  EDUCATION_LEVELS,
+  educationOf,
+  filterRecords,
+  fullYears,
+  genderOf,
+  summarize,
+  tenureGroup,
+} from './workforce'
 import { getPrototypeSnapshot } from '../data/repository'
 import { emptyFilters } from '../types/workforce'
 
@@ -30,6 +42,11 @@ describe('canonical data rules', () => {
     expect(educationOf({ educationCode: 81 })).toBe('SLTP')
     expect(educationOf({ educationCode: null })).toBe('Tidak diketahui')
   })
+  it('knows every official education code from SD (80) to Pelatihan (90), in order', () => {
+    expect([80, 83, 84, 90].map(code => educationOf({ educationCode: code }))).toEqual(['SD', 'D1', 'D2', 'Pelatihan'])
+    expect(EDUCATION_LEVELS).toEqual(['SD', 'SLTP', 'SLTA', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3', 'Pelatihan'])
+    expect(educationOf({ educationCode: 79 })).toBe('Kode tidak dikenal')
+  })
 })
 
 describe('July 2026 snapshot reconciliation', () => {
@@ -54,8 +71,16 @@ describe('July 2026 snapshot reconciliation', () => {
     expect(matrix.totals[matrix.bands.indexOf('Tidak tersedia')]).toBe(107)
   })
   it('combines independent filters on one record set', () => {
-    const filtered = filterRecords(records, { ...emptyFilters, directorate: ['DIREKTORAT OPERASI'], gender: ['P'], status: ['Aktif', 'PKWT'] }, snapshot.asOf)
-    expect(filtered.every(record => record.directorate === 'DIREKTORAT OPERASI' && record.genderCode === 2 && ['Aktif', 'PKWT'].includes(record.status))).toBe(true)
+    const filtered = filterRecords(
+      records,
+      { ...emptyFilters, directorate: ['DIREKTORAT OPERASI'], gender: ['P'], status: ['Aktif', 'PKWT'] },
+      snapshot.asOf,
+    )
+    expect(
+      filtered.every(
+        record => record.directorate === 'DIREKTORAT OPERASI' && record.genderCode === 2 && ['Aktif', 'PKWT'].includes(record.status),
+      ),
+    ).toBe(true)
     expect(filtered.length).toBeGreaterThan(0)
   })
   it('filters masa kerja from the snapshot date', () => {
@@ -68,7 +93,11 @@ describe('July 2026 snapshot reconciliation', () => {
 describe('filters across periods', () => {
   it('releases filter values that do not exist in another period', async () => {
     const { pruneFilters } = await import('./filters')
-    const result = pruneFilters({ ...emptyFilters, division: [snapshot.records[0].division, 'DIVISI HILANG'], gender: ['L'] }, snapshot.records, snapshot.asOf)
+    const result = pruneFilters(
+      { ...emptyFilters, division: [snapshot.records[0].division, 'DIVISI HILANG'], gender: ['L'] },
+      snapshot.records,
+      snapshot.asOf,
+    )
     expect(result.filters.division).toEqual([snapshot.records[0].division])
     expect(result.filters.gender).toEqual(['L'])
     expect(result.released).toEqual(['Divisi: DIVISI HILANG'])

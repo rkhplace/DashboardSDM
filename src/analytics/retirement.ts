@@ -1,4 +1,5 @@
 import type { EmployeeRecord } from '../types/workforce'
+import { monthLabel } from './periods'
 
 export const DEFAULT_RETIREMENT_AGE = 56
 export const RETIREMENT_AGE_OPTIONS = [55, 56, 57, 58, 59, 60] as const
@@ -7,7 +8,11 @@ const NON_RETIRING_STATUS = /pkwt|direksi|komisaris|cltp/i
 
 export type RiskLevel = 'Tinggi' | 'Sedang' | 'Rendah'
 
-export interface RetirementSettings { age: number; horizonYears: number; statuses: string[] }
+export interface RetirementSettings {
+  age: number
+  horizonYears: number
+  statuses: string[]
+}
 
 export interface RetirementCandidate {
   record: EmployeeRecord
@@ -37,10 +42,12 @@ export interface RetirementProjection {
 }
 
 export function defaultRetirementStatuses(records: EmployeeRecord[]): string[] {
-  return [...new Set(records.map(record => record.status))].filter(status => status && !NON_RETIRING_STATUS.test(status)).sort((a, b) => a.localeCompare(b, 'id'))
+  return [...new Set(records.map(record => record.status))]
+    .filter(status => status && !NON_RETIRING_STATUS.test(status))
+    .sort((a, b) => a.localeCompare(b, 'id'))
 }
 
-export function isKeyPosition(record: Pick<EmployeeRecord, 'positionType'>): boolean {
+function isKeyPosition(record: Pick<EmployeeRecord, 'positionType'>): boolean {
   return /struktural/i.test(record.positionType ?? '')
 }
 
@@ -59,13 +66,12 @@ export function retirementDate(birthDate: string | null, age: number): string | 
   return validIso(birthDate) ? addYears(birthDate, age) : null
 }
 
-function monthsBetween(from: string, to: string): number {
+/** Whole months from one ISO date to another (a month counts once its day of the month is reached). */
+function wholeMonthsBetween(from: string, to: string): number {
   const [fy, fm, fd] = from.split('-').map(Number)
   const [ty, tm, td] = to.split('-').map(Number)
   return (ty - fy) * 12 + (tm - fm) - (td < fd ? 1 : 0)
 }
-
-const monthLabel = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('id-ID', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 function riskOf(share: number, keyRetiring: number): RiskLevel {
   if (share >= 0.2 || keyRetiring > 0) return 'Tinggi'
@@ -82,9 +88,18 @@ export function projectRetirement(records: EmployeeRecord[], asOf: string, setti
   const candidates: RetirementCandidate[] = []
   for (const record of counted) {
     const retireOn = retirementDate(record.birthDate, settings.age)
-    if (!retireOn) { invalidBirthDate++; continue }
+    if (!retireOn) {
+      invalidBirthDate++
+      continue
+    }
     if (retireOn > horizonEnd) continue
-    candidates.push({ record, retireOn, monthsLeft: Math.max(0, monthsBetween(asOf, retireOn)), overdue: retireOn <= asOf, keyPosition: isKeyPosition(record) })
+    candidates.push({
+      record,
+      retireOn,
+      monthsLeft: Math.max(0, wholeMonthsBetween(asOf, retireOn)),
+      overdue: retireOn <= asOf,
+      keyPosition: isKeyPosition(record),
+    })
   }
   candidates.sort((a, b) => a.retireOn.localeCompare(b.retireOn) || a.record.name.localeCompare(b.record.name, 'id'))
 
@@ -94,7 +109,11 @@ export function projectRetirement(records: EmployeeRecord[], asOf: string, setti
     const inWindow = candidates.filter(candidate => candidate.retireOn > start && candidate.retireOn <= end)
     const first = new Date(`${start}T00:00:00Z`)
     first.setUTCDate(first.getUTCDate() + 1)
-    return { label: `${monthLabel(first.toISOString().slice(0, 10))} – ${monthLabel(end)}`, count: inWindow.length, keyCount: inWindow.filter(candidate => candidate.keyPosition).length }
+    return {
+      label: `${monthLabel(first.toISOString().slice(0, 7))} – ${monthLabel(end.slice(0, 7))}`,
+      count: inWindow.length,
+      keyCount: inWindow.filter(candidate => candidate.keyPosition).length,
+    }
   })
 
   const byDivision = new Map<string, { counted: number; retiring: number; keyRetiring: number }>()
@@ -109,13 +128,20 @@ export function projectRetirement(records: EmployeeRecord[], asOf: string, setti
     item.retiring++
     if (candidate.keyPosition) item.keyRetiring++
   }
-  const divisions = [...byDivision].filter(([, item]) => item.retiring > 0).map(([division, item]) => {
-    const share = item.counted ? item.retiring / item.counted : 0
-    return { division, ...item, share, risk: riskOf(share, item.keyRetiring) }
-  }).sort((a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk] || b.share - a.share || b.retiring - a.retiring)
+  const divisions = [...byDivision]
+    .filter(([, item]) => item.retiring > 0)
+    .map(([division, item]) => {
+      const share = item.counted ? item.retiring / item.counted : 0
+      return { division, ...item, share, risk: riskOf(share, item.keyRetiring) }
+    })
+    .sort((a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk] || b.share - a.share || b.retiring - a.retiring)
 
   return {
-    counted: counted.length, invalidBirthDate, candidates, windows, divisions,
+    counted: counted.length,
+    invalidBirthDate,
+    candidates,
+    windows,
+    divisions,
     overdue: candidates.filter(candidate => candidate.overdue).length,
     keyRetiring: candidates.filter(candidate => candidate.keyPosition).length,
   }

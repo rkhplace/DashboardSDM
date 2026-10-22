@@ -25,7 +25,7 @@ export interface SnapshotStore {
 
 const byPeriod = <T extends { period: string }>(a: T, b: T) => a.period.localeCompare(b.period)
 
-export function periodMeta(snapshot: EmployeeSnapshot, savedAt = new Date().toISOString()): StoredPeriod {
+function periodMeta(snapshot: EmployeeSnapshot, savedAt = new Date().toISOString()): StoredPeriod {
   return { period: snapshot.period, asOf: snapshot.asOf, sourceFile: snapshot.sourceFile, rowCount: snapshot.records.length, savedAt }
 }
 
@@ -33,15 +33,23 @@ export function periodMeta(snapshot: EmployeeSnapshot, savedAt = new Date().toIS
 export function createMemoryStore(): SnapshotStore {
   const items = new Map<string, { meta: StoredPeriod; snapshot: EmployeeSnapshot }>()
   return {
-    async list() { return [...items.values()].map(item => item.meta).sort(byPeriod) },
-    async get(period) { return items.get(period)?.snapshot ?? null },
-    async getAll() { return [...items.values()].map(item => item.snapshot).sort(byPeriod) },
+    async list() {
+      return [...items.values()].map(item => item.meta).sort(byPeriod)
+    },
+    async get(period) {
+      return items.get(period)?.snapshot ?? null
+    },
+    async getAll() {
+      return [...items.values()].map(item => item.snapshot).sort(byPeriod)
+    },
     async save(snapshot) {
       const meta = periodMeta(snapshot)
       items.set(snapshot.period, { meta, snapshot })
       return meta
     },
-    async remove(period) { items.delete(period) },
+    async remove(period) {
+      items.delete(period)
+    },
   }
 }
 
@@ -65,7 +73,7 @@ function done(transaction: IDBTransaction): Promise<void> {
 }
 
 /** Browser store: snapshots stay in this browser profile only (IndexedDB), never on a server. */
-export function createIndexedDbStore(name = 'dashboard-sdm-inti', factory: IDBFactory = indexedDB): SnapshotStore {
+function createIndexedDbStore(name = 'dashboard-sdm-inti', factory: IDBFactory = indexedDB): SnapshotStore {
   let opening: Promise<IDBDatabase> | null = null
   function open(): Promise<IDBDatabase> {
     opening ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -78,7 +86,10 @@ export function createIndexedDbStore(name = 'dashboard-sdm-inti', factory: IDBFa
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
       request.onblocked = () => reject(new Error('Penyimpanan browser sedang dipakai tab lain. Tutup tab lain lalu coba lagi.'))
-    }).catch(error => { opening = null; throw error })
+    }).catch(error => {
+      opening = null
+      throw error
+    })
     return opening
   }
   return {
@@ -89,7 +100,9 @@ export function createIndexedDbStore(name = 'dashboard-sdm-inti', factory: IDBFa
     },
     async get(period) {
       const db = await open()
-      return (await promised(db.transaction(SNAPSHOTS).objectStore(SNAPSHOTS).get(period) as IDBRequest<EmployeeSnapshot | undefined>)) ?? null
+      return (
+        (await promised(db.transaction(SNAPSHOTS).objectStore(SNAPSHOTS).get(period) as IDBRequest<EmployeeSnapshot | undefined>)) ?? null
+      )
     },
     async getAll() {
       const db = await open()
@@ -100,7 +113,9 @@ export function createIndexedDbStore(name = 'dashboard-sdm-inti', factory: IDBFa
       const db = await open()
       const meta = periodMeta(snapshot)
       const transaction = db.transaction([SNAPSHOTS, PERIODS], 'readwrite')
-      transaction.objectStore(SNAPSHOTS).put({ period: snapshot.period, asOf: snapshot.asOf, sourceFile: snapshot.sourceFile, records: snapshot.records })
+      transaction
+        .objectStore(SNAPSHOTS)
+        .put({ period: snapshot.period, asOf: snapshot.asOf, sourceFile: snapshot.sourceFile, records: snapshot.records })
       transaction.objectStore(PERIODS).put(meta)
       await done(transaction)
       return meta

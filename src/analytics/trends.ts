@@ -1,5 +1,6 @@
 import type { EmployeeRecord, EmployeeSnapshot, WorkforceFilters } from '../types/workforce'
 import { isContract } from './contracts'
+import { monthsBetween } from './periods'
 import { filterRecords, fullYears, summarize } from './workforce'
 
 /*
@@ -20,7 +21,7 @@ import { filterRecords, fullYears, summarize } from './workforce'
 export type ExitReason = 'Kontrak selesai' | 'PKWT berhenti' | 'Usia pensiun' | 'Tidak diketahui'
 export type ContractOutcome = 'Diperpanjang' | 'Diangkat tetap' | 'Selesai' | 'Belum ada keputusan'
 /** Display order: the outcome that needs action first. Also the stacked-bar order its colours were validated in. */
-export const CONTRACT_OUTCOMES: ContractOutcome[] = ['Belum ada keputusan', 'Diangkat tetap', 'Diperpanjang', 'Selesai']
+const CONTRACT_OUTCOMES: ContractOutcome[] = ['Belum ada keputusan', 'Diangkat tetap', 'Diperpanjang', 'Selesai']
 
 export interface ContractFollowUp {
   before: EmployeeRecord
@@ -85,7 +86,7 @@ export interface MovementSummary {
   contractFollowUps: ContractFollowUp[]
 }
 
-const average = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+const average = (values: number[]) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null)
 const byName = (a: EmployeeRecord, b: EmployeeRecord) => a.name.localeCompare(b.name, 'id')
 
 function exitReason(record: EmployeeRecord, laterAsOf: string, retirementAge: number): ExitReason {
@@ -124,7 +125,7 @@ export function matchNipChanges(gone: EmployeeRecord[], arrived: EmployeeRecord[
     const map = new Map<string, EmployeeRecord[]>()
     for (const record of records) {
       const key = personKey(record)
-      if (key) map.set(key, [...map.get(key) ?? [], record])
+      if (key) map.set(key, [...(map.get(key) ?? []), record])
     }
     return map
   }
@@ -141,13 +142,6 @@ export function matchNipChanges(gone: EmployeeRecord[], arrived: EmployeeRecord[
   return pairs
 }
 
-/** Calendar months from one YYYY-MM period to another. */
-export function monthsBetween(from: string, to: string): number {
-  const [fy, fm] = from.split('-').map(Number)
-  const [ty, tm] = to.split('-').map(Number)
-  return (ty - fy) * 12 + (tm - fm)
-}
-
 /** Months between the first and last stored period that have no upload. */
 export function missingMonths(periods: string[]): string[] {
   const sorted = [...new Set(periods)].sort()
@@ -161,35 +155,63 @@ export function missingMonths(periods: string[]): string[] {
   return missing
 }
 
-const scopeOf = (snapshot: EmployeeSnapshot, filters: WorkforceFilters) => new Set(filterRecords(snapshot.records, filters, snapshot.asOf).map(record => record.nip))
+const scopeOf = (snapshot: EmployeeSnapshot, filters: WorkforceFilters) =>
+  new Set(filterRecords(snapshot.records, filters, snapshot.asOf).map(record => record.nip))
 
-export function compareSnapshots(previous: EmployeeSnapshot, current: EmployeeSnapshot, filters: WorkforceFilters, retirementAge: number): MovementSummary {
+export function compareSnapshots(
+  previous: EmployeeSnapshot,
+  current: EmployeeSnapshot,
+  filters: WorkforceFilters,
+  retirementAge: number,
+): MovementSummary {
   return compareScoped(previous, current, scopeOf(previous, filters), scopeOf(current, filters), retirementAge)
 }
 
 /** compareSnapshots with the filtered NIP sets already computed (periodSeries reuses them across neighbouring pairs). */
-function compareScoped(previous: EmployeeSnapshot, current: EmployeeSnapshot, beforeScope: Set<string>, afterScope: Set<string>, retirementAge: number): MovementSummary {
+function compareScoped(
+  previous: EmployeeSnapshot,
+  current: EmployeeSnapshot,
+  beforeScope: Set<string>,
+  afterScope: Set<string>,
+  retirementAge: number,
+): MovementSummary {
   const before = new Map(previous.records.map(record => [record.nip, record]))
   const after = new Map(current.records.map(record => [record.nip, record]))
-  const inScope = (pair: { before: EmployeeRecord; after: EmployeeRecord }) => beforeScope.has(pair.before.nip) || afterScope.has(pair.after.nip)
+  const inScope = (pair: { before: EmployeeRecord; after: EmployeeRecord }) =>
+    beforeScope.has(pair.before.nip) || afterScope.has(pair.after.nip)
 
-  const renamed = matchNipChanges(previous.records.filter(record => !after.has(record.nip)), current.records.filter(record => !before.has(record.nip)))
+  const renamed = matchNipChanges(
+    previous.records.filter(record => !after.has(record.nip)),
+    current.records.filter(record => !before.has(record.nip)),
+  )
   const renamedBefore = new Set(renamed.map(pair => pair.before.nip))
   const renamedAfter = new Set(renamed.map(pair => pair.after.nip))
   const nipChanges = renamed.filter(inScope).sort((a, b) => byName(a.after, b.after))
 
-  const joined = current.records.filter(record => !before.has(record.nip) && !renamedAfter.has(record.nip) && afterScope.has(record.nip)).sort(byName)
-  const left = previous.records.filter(record => !after.has(record.nip) && !renamedBefore.has(record.nip) && beforeScope.has(record.nip)).sort(byName)
+  const joined = current.records
+    .filter(record => !before.has(record.nip) && !renamedAfter.has(record.nip) && afterScope.has(record.nip))
+    .sort(byName)
+  const left = previous.records
+    .filter(record => !after.has(record.nip) && !renamedBefore.has(record.nip) && beforeScope.has(record.nip))
+    .sort(byName)
     .map(record => ({ record, reason: exitReason(record, current.asOf, retirementAge) }))
-  const pairs = [...current.records.filter(record => before.has(record.nip)).map(record => ({ before: before.get(record.nip)!, after: record })), ...renamed].filter(inScope)
+  const pairs = [
+    ...current.records.filter(record => before.has(record.nip)).map(record => ({ before: before.get(record.nip)!, after: record })),
+    ...renamed,
+  ].filter(inScope)
   const transfers = pairs.filter(pair => pair.before.division !== pair.after.division || pair.before.directorate !== pair.after.directorate)
-  const bandChanges = pairs.filter(pair => pair.before.band != null && pair.after.band != null && pair.before.band !== pair.after.band)
+  const bandChanges = pairs
+    .filter(pair => pair.before.band != null && pair.after.band != null && pair.before.band !== pair.after.band)
     .map(pair => ({ ...pair, direction: (pair.after.band! > pair.before.band! ? 'naik' : 'turun') as 'naik' | 'turun' }))
   const statusChanges = pairs.filter(pair => pair.before.status !== pair.after.status)
   const headcountBefore = beforeScope.size
   const headcountAfter = afterScope.size
   // PKWT are left out of turnover entirely, so the denominator counts non-PKWT employees only.
-  const permanent = (records: Map<string, EmployeeRecord>, scope: Set<string>) => { let count = 0; for (const nip of scope) if (!isContract(records.get(nip)!)) count++; return count }
+  const permanent = (records: Map<string, EmployeeRecord>, scope: Set<string>) => {
+    let count = 0
+    for (const nip of scope) if (!isContract(records.get(nip)!)) count++
+    return count
+  }
   const turnoverBase = (permanent(before, beforeScope) + permanent(after, afterScope)) / 2
   const contractEnded = left.filter(item => item.reason === 'Kontrak selesai').length
   const contractExits = left.filter(item => isContract(item.record)).length
@@ -206,11 +228,28 @@ function compareScoped(previous: EmployeeSnapshot, current: EmployeeSnapshot, be
     })
     .sort((a, b) => a.before.contractEnd!.localeCompare(b.before.contractEnd!) || byName(a.before, b.before))
   return {
-    from: previous.period, to: current.period, headcountBefore, headcountAfter,
-    joined, left, transfers, bandChanges, statusChanges, nipChanges, contractFollowUps,
-    turnoverExits, contractExits, contractEnded, turnoverBase, turnover, spanMonths, monthlyTurnover: turnover === null ? null : turnover / spanMonths,
+    from: previous.period,
+    to: current.period,
+    headcountBefore,
+    headcountAfter,
+    joined,
+    left,
+    transfers,
+    bandChanges,
+    statusChanges,
+    nipChanges,
+    contractFollowUps,
+    turnoverExits,
+    contractExits,
+    contractEnded,
+    turnoverBase,
+    turnover,
+    spanMonths,
+    monthlyTurnover: turnover === null ? null : turnover / spanMonths,
     staleJoins: joined.filter(record => record.joinDate && record.joinDate <= previous.asOf).map(record => record.nip),
-    exitReasons: reasons.map(reason => ({ reason, count: left.filter(item => item.reason === reason).length })).filter(item => item.count > 0),
+    exitReasons: reasons
+      .map(reason => ({ reason, count: left.filter(item => item.reason === reason).length }))
+      .filter(item => item.count > 0),
   }
 }
 
@@ -226,9 +265,15 @@ export function periodSeries(snapshots: EmployeeSnapshot[], filters: WorkforceFi
     const tenures = records.map(record => fullYears(record.joinDate, snapshot.asOf)).filter((value): value is number => value !== null)
     const movement = index > 0 ? compareScoped(ordered[index - 1], snapshot, scopes[index - 1], scopes[index], retirementAge) : null
     return {
-      period: snapshot.period, asOf: snapshot.asOf,
-      headcount: summary.total, active: summary.active, contracts: records.filter(isContract).length,
-      male: summary.male, female: summary.female, averageAge: summary.averageAge, averageTenure: average(tenures),
+      period: snapshot.period,
+      asOf: snapshot.asOf,
+      headcount: summary.total,
+      active: summary.active,
+      contracts: records.filter(isContract).length,
+      male: summary.male,
+      female: summary.female,
+      averageAge: summary.averageAge,
+      averageTenure: average(tenures),
       joined: movement ? movement.joined.length : null,
       left: movement ? movement.left.length : null,
       contractExits: movement ? movement.contractExits : null,

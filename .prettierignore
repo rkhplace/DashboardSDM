@@ -1,0 +1,6 @@
+dist/
+node_modules/
+api/chat.mjs
+package-lock.json
+src/data/snapshot-*.json
+*.md

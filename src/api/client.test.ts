@@ -5,7 +5,10 @@ import { getPrototypeSnapshot } from '../data/repository'
 import { emptyFilters, type EmployeeSnapshot } from '../types/workforce'
 import { prepareBody, sendChat } from './client'
 
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+})
 
 async function bodyJson(body: BodyInit | null | undefined) {
   if (body instanceof Blob) return parseBody(Buffer.from(await body.arrayBuffer())) as Promise<Record<string, unknown>>
@@ -18,8 +21,13 @@ function month(snapshot: EmployeeSnapshot, period: string): EmployeeSnapshot {
 
 it('sends production chat requests to the Vercel function path', async () => {
   vi.stubEnv('PROD', true)
-  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ conversationId: 'c', answer: 'ok', evidence: [], limitations: [] }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }))
+  const fetchMock = vi.fn(
+    async () =>
+      new Response(JSON.stringify({ conversationId: 'c', answer: 'ok', evidence: [], limitations: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+  )
   vi.stubGlobal('fetch', fetchMock)
   const retirement = { age: 56, horizonYears: 5, statuses: ['Aktif'] }
   await sendChat('session', getPrototypeSnapshot(), 'Berapa karyawan?', emptyFilters, '', [], undefined, retirement)
@@ -59,7 +67,12 @@ it('falls back to a plain body trimmed to 4 MB when the browser cannot compress'
   const active = { ...getPrototypeSnapshot(), period: '2026-12', asOf: '2026-12-31' }
   const earlier = Array.from({ length: 11 }, (_, index) => month(active, `2026-${String(index + 1).padStart(2, '0')}`))
   const perPeriod = JSON.stringify(encodeHistory([earlier[0]], active).periods[0]).length
-  const prepared = await prepareBody({ message: 'x'.repeat(4 * 1024 * 1024 - 96 * 1024 - perPeriod * 3) }, active, earlier, async () => null)
+  const prepared = await prepareBody(
+    { message: 'x'.repeat(4 * 1024 * 1024 - 96 * 1024 - perPeriod * 3) },
+    active,
+    earlier,
+    async () => null,
+  )
   expect(typeof prepared.body).toBe('string')
   expect(prepared.headers['Content-Type']).toBe('application/json')
   expect(prepared.periodsSent).toBeLessThan(11)

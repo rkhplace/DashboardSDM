@@ -6,13 +6,24 @@ import { workforceTool } from './query.ts'
 import { retirementTool } from './retirementTool.ts'
 import { trendTool } from './trendTool.ts'
 
-export interface GeminiReply { answer: string; evidence?: { metric: string; value: number }[] }
+export interface GeminiReply {
+  answer: string
+  evidence?: { metric: string; value: number }[]
+}
 
 type Step = { type?: string; name?: string; id?: string; arguments?: unknown; content?: { type?: string; text?: string }[] }
 
 type Runner = (arguments_: unknown) => unknown
 /** Tool runners for one chat turn; only the ones provided are offered to the model. */
-export interface TurnTools { runQuery?: Runner; applyFilters?: Runner; listEmployees?: Runner; projectRetirement?: Runner; projectContracts?: Runner; queryTrends?: Runner; checkDataQuality?: Runner }
+export interface TurnTools {
+  runQuery?: Runner
+  applyFilters?: Runner
+  listEmployees?: Runner
+  projectRetirement?: Runner
+  projectContracts?: Runner
+  queryTrends?: Runner
+  checkDataQuality?: Runner
+}
 const TOOLS = [
   { name: 'query_workforce', definition: workforceTool, runner: 'runQuery' },
   { name: 'set_dashboard_filters', definition: filterTool, runner: 'applyFilters' },
@@ -43,21 +54,33 @@ export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<
   const history: unknown[] = [{ type: 'user_input', content: [{ type: 'text', text: prompt }] }]
   const evidence: { metric: string; value: number }[] = []
   const offered = TOOLS.filter(tool => tools[tool.runner])
+  // Gemini 3 reasons at "high" when no level is given, which can take many seconds per round. Answers here come from
+  // tool results, so "low" is enough; GEMINI_THINKING_LEVEL overrides it, and an empty value sends no level at all.
+  const thinking = (process.env.GEMINI_THINKING_LEVEL ?? 'low').trim()
   for (let round = 0; round < MAX_ROUNDS; round++) {
     // The last round goes out without tools so the model must answer with what it already gathered.
     const finalRound = round === MAX_ROUNDS - 1
-    const send = (useModel: string) => fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({ model: useModel, store: false, input: history, ...(offered.length && !finalRound ? { tools: offered.map(tool => tool.definition) } : {}) }),
-      signal: AbortSignal.timeout(25000),
-    })
+    const send = (useModel: string) =>
+      fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          model: useModel,
+          store: false,
+          input: history,
+          ...(offered.length && !finalRound ? { tools: offered.map(tool => tool.definition) } : {}),
+          ...(thinking ? { generation_config: { thinking_level: thinking } } : {}),
+        }),
+        signal: AbortSignal.timeout(25000),
+      })
     let response = await send(model)
     // 5xx from Google is usually a short overload ("high demand"): retry with growing pauses,
     // then switch to the fallback model (with one retry of its own) if one is set.
     for (let attempt = 0; RETRYABLE.has(response.status) && attempt < RETRY_STEPS.length; attempt++) {
       const wait = retryDelay(response, attempt)
-      console.error(`[gemini] HTTP ${response.status} (model ${model}), retry ${attempt + 1}/${RETRY_STEPS.length} in ${wait} ms: ${(await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`)
+      console.error(
+        `[gemini] HTTP ${response.status} (model ${model}), retry ${attempt + 1}/${RETRY_STEPS.length} in ${wait} ms: ${(await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`,
+      )
       await new Promise(resolve => setTimeout(resolve, wait))
       response = await send(model)
     }
@@ -76,22 +99,31 @@ export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<
       const detail = (await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 600)
       console.error(`[gemini] HTTP ${response.status} (model ${model}): ${detail}`)
       if (response.status === 429) throw new ServiceError(429, 'AI_RATE_LIMIT', 'Batas penggunaan Gemini tercapai. Coba lagi nanti.')
-      if (response.status === 400 || response.status === 401 || response.status === 403) throw new ServiceError(502, 'AI_REJECTED', 'Gemini menolak permintaan. Periksa GEMINI_API_KEY dan GEMINI_MODEL di backend.')
-      if (response.status === 404) throw new ServiceError(502, 'AI_MODEL_NOT_FOUND', `Model Gemini "${model}" tidak ditemukan. Periksa GEMINI_MODEL di backend.`)
-      if (RETRYABLE.has(response.status)) throw new ServiceError(503, 'AI_BUSY', `Layanan Gemini sedang sibuk (kode ${response.status}). Coba lagi beberapa saat.`)
+      if (response.status === 400 || response.status === 401 || response.status === 403)
+        throw new ServiceError(502, 'AI_REJECTED', 'Gemini menolak permintaan. Periksa GEMINI_API_KEY dan GEMINI_MODEL di backend.')
+      if (response.status === 404)
+        throw new ServiceError(502, 'AI_MODEL_NOT_FOUND', `Model Gemini "${model}" tidak ditemukan. Periksa GEMINI_MODEL di backend.`)
+      if (RETRYABLE.has(response.status))
+        throw new ServiceError(503, 'AI_BUSY', `Layanan Gemini sedang sibuk (kode ${response.status}). Coba lagi beberapa saat.`)
       throw new ServiceError(502, 'AI_UNAVAILABLE', `Gemini tidak dapat menjawab saat ini (kode ${response.status}).`)
     }
-    const result = await response.json() as { steps?: Step[] }
+    const result = (await response.json()) as { steps?: Step[] }
     const steps = result.steps ?? []
     history.push(...steps)
     const calls = steps.filter(step => step.type === 'function_call')
     if (calls.length && offered.length) {
-      if (calls.length > 8) throw new ServiceError(502, 'AI_TOOL_LIMIT', 'Analisis membutuhkan terlalu banyak perhitungan sekaligus. Coba pertanyaan yang lebih spesifik.')
+      if (calls.length > 8)
+        throw new ServiceError(
+          502,
+          'AI_TOOL_LIMIT',
+          'Analisis membutuhkan terlalu banyak perhitungan sekaligus. Coba pertanyaan yang lebih spesifik.',
+        )
       for (const call of calls) {
         const runner = offered.find(tool => tool.name === call.name)?.runner
         let output: unknown
-        try { output = runner ? tools[runner]!(call.arguments) : { error: 'Alat tidak dikenal.' } }
-        catch (error) {
+        try {
+          output = runner ? tools[runner]!(call.arguments) : { error: 'Alat tidak dikenal.' }
+        } catch (error) {
           // A failing tool should not sink the whole answer; Gemini can explain that the figure is unavailable.
           console.error(`[gemini] tool ${call.name} failed`, error instanceof Error ? error.message : typeof error)
           output = { error: 'Perhitungan ini gagal dijalankan. Sampaikan bahwa angkanya belum tersedia.' }
@@ -102,12 +134,22 @@ export async function askGemini(prompt: string, tools: TurnTools = {}): Promise<
           const value = typeof data.average === 'number' ? data.average : data.matched
           if (typeof value === 'number') evidence.push({ metric, value })
         }
-        history.push({ type: 'function_result', name: call.name, call_id: call.id, result: [{ type: 'text', text: JSON.stringify(toolSafe(output)) }] })
+        history.push({
+          type: 'function_result',
+          name: call.name,
+          call_id: call.id,
+          result: [{ type: 'text', text: JSON.stringify(toolSafe(output)) }],
+        })
       }
       continue
     }
-    const answer = steps.filter(step => step.type === 'model_output')
-      .flatMap(step => step.content ?? []).filter(part => part.type === 'text').map(part => part.text ?? '').join('\n').trim()
+    const answer = steps
+      .filter(step => step.type === 'model_output')
+      .flatMap(step => step.content ?? [])
+      .filter(part => part.type === 'text')
+      .map(part => part.text ?? '')
+      .join('\n')
+      .trim()
     if (answer) return { answer, evidence }
     throw new ServiceError(502, 'AI_EMPTY_RESPONSE', 'Gemini tidak menghasilkan jawaban teks.')
   }
@@ -122,7 +164,10 @@ const MAX_TOOL_TEXT = 200
  */
 export function toolSafe(value: unknown, depth = 0): unknown {
   if (typeof value === 'string') {
-    const clean = value.replace(/\p{Cc}/gu, ' ').replace(/\s+/g, ' ').trim()
+    const clean = value
+      .replace(/\p{Cc}/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
     return clean.length > MAX_TOOL_TEXT ? `${clean.slice(0, MAX_TOOL_TEXT)}…` : clean
   }
   if (depth > 12 || value === null || typeof value !== 'object') return value
@@ -131,5 +176,11 @@ export function toolSafe(value: unknown, depth = 0): unknown {
 }
 
 export class ServiceError extends Error {
-  constructor(public status: number, public code: string, message: string) { super(message) }
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+  ) {
+    super(message)
+  }
 }

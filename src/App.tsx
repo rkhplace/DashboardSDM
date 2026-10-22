@@ -13,11 +13,33 @@ function RequireUpload({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <WorkforceSessionProvider><BrowserRouter><Suspense fallback={<div className="route-loading">Memuat halaman...</div>}><Routes>
-    <Route index element={<Navigate to="/impor" replace />} />
-    <Route path="dashboard" element={<RequireUpload><DashboardPage /></RequireUpload>} />
-    <Route path="direktori" element={<RequireUpload><Navigate to="/dashboard#pegawai" replace /></RequireUpload>} />
-    <Route path="impor" element={<ImportPage />} />
-    <Route path="*" element={<Navigate to="/impor" replace />} />
-  </Routes></Suspense></BrowserRouter></WorkforceSessionProvider>
+  return (
+    <WorkforceSessionProvider>
+      <BrowserRouter>
+        <Suspense fallback={<div className="route-loading">Memuat halaman...</div>}>
+          <Routes>
+            <Route index element={<Navigate to="/impor" replace />} />
+            <Route
+              path="dashboard"
+              element={
+                <RequireUpload>
+                  <DashboardPage />
+                </RequireUpload>
+              }
+            />
+            <Route
+              path="direktori"
+              element={
+                <RequireUpload>
+                  <Navigate to="/dashboard#pegawai" replace />
+                </RequireUpload>
+              }
+            />
+            <Route path="impor" element={<ImportPage />} />
+            <Route path="*" element={<Navigate to="/impor" replace />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </WorkforceSessionProvider>
+  )
 }

@@ -2,9 +2,24 @@ import { AGE_GROUPS, TENURE_GROUPS, educationOf, genderOf } from '../src/analyti
 import { emptyFilters, type ChatChart, type EmployeeRecord, type WorkforceFilters } from '../src/types/workforce.ts'
 
 const FIELD_LABELS: Record<string, string> = {
-  status: 'status', activity: 'activity', directorate: 'direktorat', division: 'divisi', section: 'bagian', position: 'jabatan',
-  positionType: 'jenis jabatan', businessFunction: 'fungsi bisnis', band: 'band', gender: 'jenis kelamin', education: 'pendidikan',
-  religion: 'agama', institution: 'institusi', major: 'jurusan', age: 'usia', ageGroup: 'kelompok usia', tenure: 'masa kerja', tenureGroup: 'kelompok masa kerja',
+  status: 'status',
+  activity: 'activity',
+  directorate: 'direktorat',
+  division: 'divisi',
+  section: 'bagian',
+  position: 'jabatan',
+  positionType: 'jenis jabatan',
+  businessFunction: 'fungsi bisnis',
+  band: 'band',
+  gender: 'jenis kelamin',
+  education: 'pendidikan',
+  religion: 'agama',
+  institution: 'institusi',
+  major: 'jurusan',
+  age: 'usia',
+  ageGroup: 'kelompok usia',
+  tenure: 'masa kerja',
+  tenureGroup: 'kelompok masa kerja',
 }
 const MAX_BARS = 15
 const MAX_CHARTS = 2
@@ -14,10 +29,13 @@ const object = (value: unknown): value is Record<string, unknown> => typeof valu
 export function chartFromQuery(output: unknown): ChatChart | null {
   if (!object(output) || !Array.isArray(output.groups) || !Array.isArray(output.groupBy)) return null
   const average = output.operation === 'average'
-  const data = output.groups.filter(object).map(group => ({
-    label: object(group.values) ? Object.values(group.values).map(String).join(' · ') : '',
-    value: average ? (typeof group.average === 'number' ? Math.round(group.average * 10) / 10 : NaN) : Number(group.count),
-  })).filter(item => item.label && Number.isFinite(item.value))
+  const data = output.groups
+    .filter(object)
+    .map(group => ({
+      label: object(group.values) ? Object.values(group.values).map(String).join(' · ') : '',
+      value: average ? (typeof group.average === 'number' ? Math.round(group.average * 10) / 10 : NaN) : Number(group.count),
+    }))
+    .filter(item => item.label && Number.isFinite(item.value))
   if (data.length < 2) return null
   const by = output.groupBy.map(field => FIELD_LABELS[String(field)] ?? String(field)).join(' & ')
   const field = FIELD_LABELS[String(output.field)] ?? String(output.field)
@@ -31,12 +49,21 @@ export function chartFromQuery(output: unknown): ChatChart | null {
 
 type FilterKey = keyof WorkforceFilters
 const FILTER_KEYS = Object.keys(emptyFilters) as FilterKey[]
-const normal = (value: string) => value.toLocaleLowerCase('id').replace(/[‐‑‒–—−]/g, '-').replace(/[^a-z0-9<>≤+-]/g, '')
+const normal = (value: string) =>
+  value
+    .toLocaleLowerCase('id')
+    .replace(/[‐‑‒–—−]/g, '-')
+    .replace(/[^a-z0-9<>≤+-]/g, '')
 
 export const filterTool = {
   type: 'function',
   name: 'set_dashboard_filters',
-  description: 'Usulkan filter dashboard saat pengguna meminta menampilkan, menyaring, memfokuskan, atau membuka kelompok tertentu di dashboard (misal "tampilkan PKWT di divisi X"). Filter ini menggantikan filter aktif; pengguna menerapkannya lewat tombol di bawah jawaban. Pakai nilai kategori persis dari PROFIL DATA. Isi hanya kunci yang diminta.',
+  description: [
+    'Usulkan filter dashboard saat pengguna meminta menampilkan, menyaring, memfokuskan, atau membuka kelompok tertentu di dashboard (misal "tampilkan PKWT di divisi X").',
+    'Filter ini menggantikan filter aktif; pengguna menerapkannya lewat tombol di bawah jawaban.',
+    'Pakai nilai kategori persis dari PROFIL DATA.',
+    'Isi hanya kunci yang diminta.',
+  ].join(' '),
   parameters: {
     type: 'object',
     properties: {
@@ -52,14 +79,14 @@ export const filterTool = {
   },
 } as const
 
-export function filterOptions(records: EmployeeRecord[]): Record<FilterKey, string[]> {
+function filterOptions(records: EmployeeRecord[]): Record<FilterKey, string[]> {
   const unique = (values: string[]) => [...new Set(values.filter(Boolean))]
   return {
     directorate: unique(records.map(record => record.directorate)),
     division: unique(records.map(record => record.division || 'Tidak diketahui')),
     status: unique(records.map(record => record.status)),
     gender: unique(records.map(record => genderOf(record))),
-    band: unique(records.map(record => record.band == null ? 'Tidak tersedia' : String(record.band))),
+    band: unique(records.map(record => (record.band == null ? 'Tidak tersedia' : String(record.band)))),
     ageGroup: [...AGE_GROUPS],
     tenureGroup: [...TENURE_GROUPS],
     education: unique(records.map(record => educationOf(record))),
@@ -76,7 +103,10 @@ export function resolveFilterSuggestion(input: unknown, records: EmployeeRecord[
   for (const key of FILTER_KEYS) {
     const raw = input[key]
     if (raw === undefined) continue
-    if (!Array.isArray(raw)) { rejected.push(key); continue }
+    if (!Array.isArray(raw)) {
+      rejected.push(key)
+      continue
+    }
     const chosen: string[] = []
     for (const value of raw.slice(0, 30)) {
       if (typeof value !== 'string' || value.length > 100) continue
@@ -95,9 +125,19 @@ export function resolveFilterSuggestion(input: unknown, records: EmployeeRecord[
 /** Tool runners for one chat turn; they record charts and filter suggestions for the response. */
 type Runner = (args: unknown) => unknown
 /** Extra read-only tools offered when their data is available. */
-export interface ExtraRunners { projectContracts?: Runner; queryTrends?: Runner; checkDataQuality?: Runner }
+export interface ExtraRunners {
+  projectContracts?: Runner
+  queryTrends?: Runner
+  checkDataQuality?: Runner
+}
 
-export function createTurnTools(runQuery: Runner, allRecords: EmployeeRecord[], runList?: Runner, runRetirement?: Runner, extra: ExtraRunners = {}) {
+export function createTurnTools(
+  runQuery: Runner,
+  allRecords: EmployeeRecord[],
+  runList?: Runner,
+  runRetirement?: Runner,
+  extra: ExtraRunners = {},
+) {
   const charts: ChatChart[] = []
   let suggestedFilters: WorkforceFilters | null = null
   return {
@@ -115,6 +155,8 @@ export function createTurnTools(runQuery: Runner, allRecords: EmployeeRecord[], 
     listEmployees: runList,
     projectRetirement: runRetirement,
     ...extra,
-    extras() { return { charts: charts.slice(-MAX_CHARTS), suggestedFilters } },
+    extras() {
+      return { charts: charts.slice(-MAX_CHARTS), suggestedFilters }
+    },
   }
 }

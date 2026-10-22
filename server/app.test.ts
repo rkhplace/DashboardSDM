@@ -13,22 +13,34 @@ describe('AI session API', () => {
         const listed = tools?.listEmployees?.({ refs: ['KARYAWAN_1'] }) as { rows: { ref: string; division: string }[] }
         return { answer: `${listed.rows[0].ref} bekerja di ${listed.rows[0].division}.` }
       }
-      const result = tools?.runQuery?.({ operation: 'average', field: 'age', filters: [{ field: 'status', operator: 'eq', value: 'Staf Komisaris' }] }) as { average: number; matched: number }
-      return { answer: `Rata-rata usia ${result.matched} staf komisaris adalah ${result.average} tahun.`, evidence: [{ metric: 'averageAge', value: result.average }] }
+      const result = tools?.runQuery?.({
+        operation: 'average',
+        field: 'age',
+        filters: [{ field: 'status', operator: 'eq', value: 'Staf Komisaris' }],
+      }) as { average: number; matched: number }
+      return {
+        answer: `Rata-rata usia ${result.matched} staf komisaris adalah ${result.average} tahun.`,
+        evidence: [{ metric: 'averageAge', value: result.average }],
+      }
     })
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
     const port = (server.address() as AddressInfo).port
     const base = `http://127.0.0.1:${port}/api/v1`
-    const post = (path: string, body: unknown) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     try {
       const snapshot = getPrototypeSnapshot()
       // The browser compresses large bodies; the local API must read them like the Vercel function does.
-      const created = await fetch(`${base}/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'Content-Encoding': 'gzip' }, body: gzipSync(JSON.stringify(snapshot)) })
+      const created = await fetch(`${base}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream', 'Content-Encoding': 'gzip' },
+        body: gzipSync(JSON.stringify(snapshot)),
+      })
       expect(created.status).toBe(201)
-      const { sessionId } = await created.json() as { sessionId: string }
+      const { sessionId } = (await created.json()) as { sessionId: string }
       const first = await post(`/sessions/${sessionId}/ai/chat`, { message: 'Rata-rata umur staf komisaris berapa?' })
       expect(first.status).toBe(200)
-      const reply = await first.json() as { conversationId: string; answer: string; evidence: { metric: string; value: number }[] }
+      const reply = (await first.json()) as { conversationId: string; answer: string; evidence: { metric: string; value: number }[] }
       expect(reply.answer).toContain('36')
       expect(reply.evidence).toEqual([{ metric: 'averageAge', value: 36, period: snapshot.period }])
       expect(prompts).toHaveLength(1)
@@ -36,23 +48,32 @@ describe('AI session API', () => {
       expect(prompts[0]).not.toContain(snapshot.records[0].name)
       expect(prompts[0]).not.toContain(snapshot.records[0].nip)
 
-      const filtered = await post(`/sessions/${sessionId}/ai/chat`, { filters: { division: ['DEKOM'] }, message: 'Bagaimana rata-rata usia staf komisaris?' })
+      const filtered = await post(`/sessions/${sessionId}/ai/chat`, {
+        filters: { division: ['DEKOM'] },
+        message: 'Bagaimana rata-rata usia staf komisaris?',
+      })
       expect(filtered.status).toBe(200)
       expect(prompts).toHaveLength(2)
       expect(prompts[1]).toContain('"total":1')
 
       const personal = await post(`/sessions/${sessionId}/ai/chat`, { message: `Bagaimana data ${snapshot.records[0].name}?` })
       expect(personal.status).toBe(200)
-      const personalReply = await personal.json() as { answer: string; conversationId: string }
+      const personalReply = (await personal.json()) as { answer: string; conversationId: string }
       expect(personalReply.answer).toBe(`${snapshot.records[0].name} bekerja di ${snapshot.records[0].division}.`)
       expect(prompts).toHaveLength(3)
       expect(prompts[2]).not.toContain(snapshot.records[0].name)
 
-      const followup = await post(`/sessions/${sessionId}/ai/chat`, { conversationId: reply.conversationId, message: 'Bagaimana dibandingkan dengan semua karyawan?' })
+      const followup = await post(`/sessions/${sessionId}/ai/chat`, {
+        conversationId: reply.conversationId,
+        message: 'Bagaimana dibandingkan dengan semua karyawan?',
+      })
       expect(followup.status).toBe(200)
       expect(prompts[3]).toContain('Rata-rata usia 4 staf komisaris')
 
-      const afterPersonal = await post(`/sessions/${sessionId}/ai/chat`, { conversationId: personalReply.conversationId, message: 'Jelaskan sebaran status.' })
+      const afterPersonal = await post(`/sessions/${sessionId}/ai/chat`, {
+        conversationId: personalReply.conversationId,
+        message: 'Jelaskan sebaran status.',
+      })
       expect(afterPersonal.status).toBe(200)
       expect(prompts[4]).toContain('KARYAWAN_1 bekerja di')
       expect(prompts[4]).not.toContain(snapshot.records[0].name)
@@ -62,16 +83,27 @@ describe('AI session API', () => {
       expect(deleted.status).toBe(204)
       expect((await post(`/sessions/${sessionId}/ai/chat`, { message: 'Berapa totalnya?' })).status).toBe(404)
     } finally {
-      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+      await new Promise<void>((resolve, reject) => server.close(error => (error ? reject(error) : resolve())))
     }
   })
 })
 
 describe('answer cleanup', () => {
   it('drops JSON echoed by the model but keeps the prose', () => {
-    const answer = 'Mayoritas ada di Divisi Pendukung Usaha.\n{ "operation": "count", "groupBy": [ "division" ], "results": [ { "division": "A", "count": 77 } ] }'
+    const answer =
+      'Mayoritas ada di Divisi Pendukung Usaha.\n{ "operation": "count", "groupBy": [ "division" ], "results": [ { "division": "A", "count": 77 } ] }'
     expect(presentAnswer(answer)).toBe('Mayoritas ada di Divisi Pendukung Usaha.')
     expect(presentAnswer('Hasil:\n```json\n{"a":1}\n```\nSelesai.')).toBe('Hasil:\n\nSelesai.')
     expect(presentAnswer('Rentang usia [26–30] paling banyak.')).toBe('Rentang usia [26–30] paling banyak.')
+  })
+})
+
+describe('prompt rules', () => {
+  it('tells the AI not to guess internal abbreviations such as status codes', async () => {
+    const { makePrompt } = await import('./app')
+    const snapshot = getPrototypeSnapshot()
+    const prompt = makePrompt(snapshot, snapshot.records, 'Apa arti CLTP?', [])
+    expect(prompt).toContain('Jangan menebak kepanjangan singkatan')
+    expect(prompt).toContain('perlu dikonfirmasi ke HC')
   })
 })

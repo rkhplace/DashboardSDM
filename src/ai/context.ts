@@ -1,4 +1,15 @@
-import { AGE_GROUPS, TENURE_GROUPS, ageGroup, bandMatrix, countBy, educationOf, fullYears, genderOf, summarize, tenureGroup } from '../analytics/workforce'
+import {
+  AGE_GROUPS,
+  TENURE_GROUPS,
+  ageGroup,
+  bandMatrix,
+  countBy,
+  educationOf,
+  fullYears,
+  genderOf,
+  summarize,
+  tenureGroup,
+} from '../analytics/workforce'
 import { hasContractColumn, projectContracts } from '../analytics/contracts'
 import type { EmployeeRecord } from '../types/workforce'
 
@@ -15,14 +26,24 @@ export function buildAggregateContext(records: EmployeeRecord[], asOf: string) {
     activity: countBy(records, record => record.activity?.trim() || '(KOSONG)'),
     ageGroup: countBy(records, record => ageGroup(fullYears(record.birthDate, asOf))),
     tenureGroup: countBy(records, record => tenureGroup(fullYears(record.joinDate, asOf))),
-    band: countBy(records, record => record.band == null ? 'Tidak tersedia' : String(record.band)),
+    band: countBy(records, record => (record.band == null ? 'Tidak tersedia' : String(record.band))),
     ageByGender: AGE_GROUPS.map(group => {
       const people = records.filter(record => ageGroup(fullYears(record.birthDate, asOf)) === group)
-      return { group, male: people.filter(record => genderOf(record) === 'L').length, female: people.filter(record => genderOf(record) === 'P').length, unknown: people.filter(record => genderOf(record) === 'UNKNOWN').length }
+      return {
+        group,
+        male: people.filter(record => genderOf(record) === 'L').length,
+        female: people.filter(record => genderOf(record) === 'P').length,
+        unknown: people.filter(record => genderOf(record) === 'UNKNOWN').length,
+      }
     }),
     tenureByGender: TENURE_GROUPS.map(group => {
       const people = records.filter(record => tenureGroup(fullYears(record.joinDate, asOf)) === group)
-      return { group, male: people.filter(record => genderOf(record) === 'L').length, female: people.filter(record => genderOf(record) === 'P').length, unknown: people.filter(record => genderOf(record) === 'UNKNOWN').length }
+      return {
+        group,
+        male: people.filter(record => genderOf(record) === 'L').length,
+        female: people.filter(record => genderOf(record) === 'P').length,
+        unknown: people.filter(record => genderOf(record) === 'UNKNOWN').length,
+      }
     }),
     bandByDivision: bandMatrix(records),
     pkwtContracts: contractSummary(records, asOf),

@@ -1,10 +1,12 @@
 import type { EmployeeRecord } from '../types/workforce'
+import { monthLabel, monthsBetween, shiftMonth } from './periods'
 
 /** Fixed-term contract statuses: "PKWT", "PKWT Proyek", "PKWT TKB", ... */
 export const isContract = (record: Pick<EmployeeRecord, 'status'>) => /pkwt/i.test(record.status)
 
 /** True when the snapshot came from a file with a contract end date column (null = column present, cell empty). */
-export const hasContractColumn = (records: Pick<EmployeeRecord, 'contractEnd'>[]) => records.some(record => record.contractEnd !== undefined)
+export const hasContractColumn = (records: Pick<EmployeeRecord, 'contractEnd'>[]) =>
+  records.some(record => record.contractEnd !== undefined)
 
 export interface ContractEnding {
   record: EmployeeRecord
@@ -27,20 +29,6 @@ export interface ContractProjection {
   divisions: { division: string; contracts: number; ending: number }[]
 }
 
-export function shiftMonth(month: string, offset: number): string {
-  const [year, value] = month.split('-').map(Number)
-  const date = new Date(Date.UTC(year, value - 1 + offset, 1))
-  return date.toISOString().slice(0, 7)
-}
-
-const monthsBetween = (from: string, to: string) => {
-  const [fy, fm] = from.split('-').map(Number)
-  const [ty, tm] = to.split('-').map(Number)
-  return (ty - fy) * 12 + (tm - fm)
-}
-
-export const monthLabel = (month: string) => new Date(`${month}-01T00:00:00Z`).toLocaleDateString('id-ID', { month: 'short', year: 'numeric', timeZone: 'UTC' })
-
 /** PKWT contracts ending after the period date (asOf), grouped per calendar month for the next `horizonMonths` months. */
 export function projectContracts(records: EmployeeRecord[], asOf: string, horizonMonths: number): ContractProjection {
   const period = asOf.slice(0, 7)
@@ -48,7 +36,12 @@ export function projectContracts(records: EmployeeRecord[], asOf: string, horizo
   const contracts = records.filter(isContract)
   const dated = contracts.filter(record => record.contractEnd)
   const list: ContractEnding[] = dated
-    .map(record => ({ record, endsOn: record.contractEnd!, monthsLeft: monthsBetween(period, record.contractEnd!.slice(0, 7)), expired: record.contractEnd! <= asOf }))
+    .map(record => ({
+      record,
+      endsOn: record.contractEnd!,
+      monthsLeft: monthsBetween(period, record.contractEnd!.slice(0, 7)),
+      expired: record.contractEnd! <= asOf,
+    }))
     .filter(item => item.expired || item.endsOn.slice(0, 7) <= lastMonth)
     .sort((a, b) => a.endsOn.localeCompare(b.endsOn) || a.record.name.localeCompare(b.record.name, 'id'))
   const upcoming = list.filter(item => !item.expired)
@@ -75,6 +68,9 @@ export function projectContracts(records: EmployeeRecord[], asOf: string, horizo
     endingWithinHorizon: upcoming.length,
     list,
     months,
-    divisions: [...byDivision].map(([division, item]) => ({ division, ...item })).filter(item => item.ending > 0).sort((a, b) => b.ending - a.ending || a.division.localeCompare(b.division, 'id')),
+    divisions: [...byDivision]
+      .map(([division, item]) => ({ division, ...item }))
+      .filter(item => item.ending > 0)
+      .sort((a, b) => b.ending - a.ending || a.division.localeCompare(b.division, 'id')),
   }
 }
