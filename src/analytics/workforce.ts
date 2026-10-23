@@ -97,8 +97,8 @@ export function filterRecords(records: EmployeeRecord[], filters: WorkforceFilte
 /** CLTP employees: still employees and part of every total, but reported as their own figure (HC guidance, Oct 2026). */
 export const isCltp = (record: Pick<EmployeeRecord, 'status'>) => /\bcltp\b/i.test(record.status)
 
-/** Board statuses; the units that hold them (e.g. DIR. UTAMA, DEKOM) sit outside the divisions. */
-const BOARD_STATUS = /^\s*(direksi|komisaris|staf komisaris)\s*$/i
+/** Board statuses (Direksi, Komisaris, Staf Komisaris, Komisaris Utama, ...); the units that hold them sit outside the divisions. */
+const BOARD_STATUS = /\b(direksi|komisaris)\b/i
 
 /**
  * Units outside the divisions: every unit that holds a Direksi, Komisaris or Staf Komisaris. The people in them
