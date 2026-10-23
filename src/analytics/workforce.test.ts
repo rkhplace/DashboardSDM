@@ -73,6 +73,18 @@ describe('July 2026 snapshot reconciliation', () => {
     expect(summarize(seconded, snapshot.asOf, boardUnits(records))).toMatchObject({ units: 0, board: 1, boardUnits: ['DIR. UTAMA'] })
     expect(summarize(seconded, snapshot.asOf)).toMatchObject({ units: 1, board: 0 })
   })
+  it('recognises board status variants and ignores ordinary statuses', () => {
+    const unit = (status: string, division: string) => ({ status, division })
+    const units = boardUnits([
+      unit('Komisaris Utama', 'DEKOM'),
+      unit('staf  komisaris', 'SEKDEKOM'),
+      unit('DIREKSI', 'DIRUT'),
+      unit('Aktif', 'DIVISI A'),
+      unit('Diperbantukan', 'DIVISI B'),
+      unit('Direksi', ''),
+    ])
+    expect([...units].sort()).toEqual(['DEKOM', 'DIRUT', 'SEKDEKOM'])
+  })
   it('reconciles status and division aggregations', () => {
     expect(countBy(records, record => record.status).reduce((sum, item) => sum + item.value, 0)).toBe(records.length)
     expect(countBy(records, record => record.division).reduce((sum, item) => sum + item.value, 0)).toBe(records.length)

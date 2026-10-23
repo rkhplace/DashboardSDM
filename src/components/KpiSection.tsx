@@ -4,7 +4,8 @@ import { formatNumber } from '../analytics/format'
 import { ageGroup, countBy, fullYears, genderOf, isCltp, summarize } from '../analytics/workforce'
 import { emptyFilters, type EmployeeRecord, type WorkforceFilters } from '../types/workforce'
 
-type Distribution = { name: string; value: number }
+/** tag: short marker shown before the name, e.g. units that are not divisions. */
+type Distribution = { name: string; value: number; tag?: string }
 type KpiKey = 'total' | 'active' | 'cltp' | 'age' | 'male' | 'female' | 'units'
 type Props = {
   records: EmployeeRecord[]
@@ -29,9 +30,12 @@ function BreakdownBars({ data, total, onSelect }: { data: Distribution[]; total:
             className="breakdown-item"
             key={item.name}
             onClick={() => onSelect(item.name)}
-            aria-label={`Filter ${item.name}, ${formatNumber(item.value)} karyawan, ${percent.toFixed(1)} persen`}
+            aria-label={`Filter ${item.name}${item.tag ? ` (${item.tag})` : ''}, ${formatNumber(item.value)} karyawan, ${percent.toFixed(1)} persen`}
           >
-            <span className="breakdown-label">{item.name}</span>
+            <span className="breakdown-label" title={item.name}>
+              {item.tag && <span className="key-tag breakdown-tag">{item.tag}</span>}
+              {item.name}
+            </span>
             <span className="breakdown-track">
               <span style={{ width: `${percent}%` }} />
             </span>
@@ -58,7 +62,14 @@ export function KpiSection({ records, periodTotal, period, asOf, boardUnits, onF
     [records],
   )
   const age = useMemo(() => countBy(records, record => ageGroup(fullYears(record.birthDate, asOf))), [records, asOf])
-  const divisions = useMemo(() => countBy(records, record => record.division), [records])
+  // Units outside the divisions stay listed (their people are employees) but are marked and placed last.
+  const divisions = useMemo(
+    () =>
+      countBy(records, record => record.division)
+        .map((item): Distribution => (boardUnits.has(item.name) ? { ...item, tag: 'bukan divisi' } : item))
+        .sort((a, b) => Number(Boolean(a.tag)) - Number(Boolean(b.tag))),
+    [records, boardUnits],
+  )
   const cltp = useMemo(() => records.filter(isCltp), [records])
   const cltpUnits = useMemo(() => countBy(cltp, record => record.division), [cltp])
   const percent = (value: number) => (summary.total ? (value / summary.total) * 100 : 0)

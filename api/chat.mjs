@@ -112,7 +112,7 @@ function filterRecords(records, filters, asOf) {
   });
 }
 var isCltp = (record) => /\bcltp\b/i.test(record.status);
-var BOARD_STATUS = /^\s*(direksi|komisaris|staf komisaris)\s*$/i;
+var BOARD_STATUS = /\b(direksi|komisaris)\b/i;
 function boardUnits(records) {
   return new Set(records.filter((record) => record.division && BOARD_STATUS.test(record.status)).map((record) => record.division));
 }

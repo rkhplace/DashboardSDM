@@ -889,6 +889,9 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.breakdown-label .breakdown-tag {
+  margin: 0 6px 0 0;
+}
 .breakdown-track {
   height: 7px;
   border-radius: 5px;
@@ -1328,7 +1331,6 @@ body:has(.dashboard-page) {
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 14px;
 }
-
 .dashboard-page .kpi-card {
   position: relative;
   min-width: 0;
