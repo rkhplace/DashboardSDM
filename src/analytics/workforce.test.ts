@@ -3,6 +3,7 @@ import {
   AGE_GROUPS,
   ageGroup,
   bandMatrix,
+  boardUnits,
   countBy,
   EDUCATION_LEVELS,
   educationOf,
@@ -57,6 +58,20 @@ describe('July 2026 snapshot reconciliation', () => {
     expect(summary.male).toBe(144)
     expect(summary.female).toBe(58)
     expect(summary.male + summary.female + summary.unknownGender).toBe(summary.total)
+  })
+  it('keeps CLTP and the Direksi/Komisaris units in the total but reports them separately', () => {
+    const summary = summarize(records, snapshot.asOf)
+    expect(summary.total).toBe(202)
+    expect(summary.cltp).toBe(19)
+    expect(summary.boardUnits).toEqual(['DEKOM', 'DIR. UTAMA', 'PENDUKUNG DEWAN KOMISARIS'])
+    // Direksi 1 + Diperbantukan 1 (DIR. UTAMA), Komisaris 1 (DEKOM), Staf Komisaris 4.
+    expect(summary.board).toBe(7)
+    expect(summary.units).toBe(7)
+  })
+  it('judges the Direksi/Komisaris units on the whole period, not on the filtered rows', () => {
+    const seconded = records.filter(record => record.status === 'Diperbantukan')
+    expect(summarize(seconded, snapshot.asOf, boardUnits(records))).toMatchObject({ units: 0, board: 1, boardUnits: ['DIR. UTAMA'] })
+    expect(summarize(seconded, snapshot.asOf)).toMatchObject({ units: 1, board: 0 })
   })
   it('reconciles status and division aggregations', () => {
     expect(countBy(records, record => record.status).reduce((sum, item) => sum + item.value, 0)).toBe(records.length)

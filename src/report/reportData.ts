@@ -8,6 +8,7 @@ import {
   TENURE_GROUPS,
   ageGroup,
   bandMatrix,
+  boardUnits,
   countBy,
   educationOf,
   fullYears,
@@ -232,7 +233,7 @@ export function buildReport(
   extras: ReportExtras = {},
 ): Report {
   const { asOf } = snapshot
-  const summary = summarize(records, asOf)
+  const summary = summarize(records, asOf, boardUnits(snapshot.records))
   const total = records.length
   const gender = (record: EmployeeRecord) =>
     genderOf(record) === 'L' ? 'Laki-laki' : genderOf(record) === 'P' ? 'Perempuan' : 'Tidak diketahui'
@@ -264,10 +265,14 @@ export function buildReport(
     kpis: [
       ['Total karyawan', formatNumber(summary.total)],
       ['Karyawan aktif', `${formatNumber(summary.active)} (${(share(summary.active, total) * 100).toFixed(1)}%)`],
+      ['Karyawan CLTP', `${formatNumber(summary.cltp)} (${(share(summary.cltp, total) * 100).toFixed(1)}%)`],
       ['Rata-rata usia', summary.averageAge == null ? '—' : `${summary.averageAge.toFixed(1)} tahun`],
       ['Laki-laki', `${formatNumber(summary.male)} (${(share(summary.male, total) * 100).toFixed(1)}%)`],
       ['Perempuan', `${formatNumber(summary.female)} (${(share(summary.female, total) * 100).toFixed(1)}%)`],
       ['Jumlah divisi', formatNumber(summary.units)],
+      ...(summary.boardUnits.length
+        ? [['Unit Direksi & Komisaris', `${formatNumber(summary.board)} orang (${summary.boardUnits.join(', ')})`] as [string, string]]
+        : []),
       [`Pensiun ≤${settings.horizonYears} tahun (usia ${settings.age})`, formatNumber(retiring)],
       ...(extras.contracts
         ? [

@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
-import { Building2, ChevronDown, Clock3, IdCard, Mars, UsersRound, Venus, X } from 'lucide-react'
+import { Building2, ChevronDown, Clock3, IdCard, Mars, UserRoundCheck, UsersRound, Venus, X } from 'lucide-react'
 import { formatNumber } from '../analytics/format'
-import { ageGroup, countBy, fullYears, genderOf, summarize } from '../analytics/workforce'
+import { ageGroup, countBy, fullYears, genderOf, isCltp, summarize } from '../analytics/workforce'
 import { emptyFilters, type EmployeeRecord, type WorkforceFilters } from '../types/workforce'
 
 type Distribution = { name: string; value: number }
-type KpiKey = 'total' | 'active' | 'age' | 'male' | 'female' | 'units'
+type KpiKey = 'total' | 'active' | 'cltp' | 'age' | 'male' | 'female' | 'units'
 type Props = {
   records: EmployeeRecord[]
   /** Employees in the whole period, before filters: the base of the "Total karyawan" meter. */
   periodTotal: number
   period: string
   asOf: string
+  /** Units outside the divisions (Direksi, Komisaris), taken from the whole period. */
+  boardUnits: Set<string>
   onFiltersChange: Dispatch<SetStateAction<WorkforceFilters>>
 }
 
@@ -43,13 +45,13 @@ function BreakdownBars({ data, total, onSelect }: { data: Distribution[]; total:
   )
 }
 
-/** The six headline figures; each opens a breakdown whose categories filter the whole dashboard. */
-export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange: setFilters }: Props) {
+/** The headline figures; each opens a breakdown whose categories filter the whole dashboard. */
+export function KpiSection({ records, periodTotal, period, asOf, boardUnits, onFiltersChange: setFilters }: Props) {
   const [selectedKpi, setSelectedKpi] = useState<KpiKey | null>(null)
   useEffect(() => {
     if (selectedKpi) document.getElementById('kpi-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [selectedKpi])
-  const summary = useMemo(() => summarize(records, asOf), [records, asOf])
+  const summary = useMemo(() => summarize(records, asOf, boardUnits), [records, asOf, boardUnits])
   const statuses = useMemo(() => countBy(records, record => record.status), [records])
   const gender = useMemo(
     () => countBy(records, record => (genderOf(record) === 'L' ? 'Laki-laki' : genderOf(record) === 'P' ? 'Perempuan' : 'Tidak diketahui')),
@@ -57,6 +59,8 @@ export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange
   )
   const age = useMemo(() => countBy(records, record => ageGroup(fullYears(record.birthDate, asOf))), [records, asOf])
   const divisions = useMemo(() => countBy(records, record => record.division), [records])
+  const cltp = useMemo(() => records.filter(isCltp), [records])
+  const cltpUnits = useMemo(() => countBy(cltp, record => record.division), [cltp])
   const percent = (value: number) => (summary.total ? (value / summary.total) * 100 : 0)
   const kpis = [
     {
@@ -64,7 +68,7 @@ export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange
       label: 'Total karyawan',
       value: formatNumber(summary.total),
       suffix: '',
-      note: 'Data pada hasil filter',
+      note: summary.board ? `Termasuk ${formatNumber(summary.board)} di unit Direksi & Komisaris` : 'Data pada hasil filter',
       share: periodTotal ? (summary.total / periodTotal) * 100 : 0,
       icon: UsersRound,
     },
@@ -76,6 +80,15 @@ export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange
       note: `${percent(summary.active).toFixed(1)}% dari hasil filter`,
       share: percent(summary.active),
       icon: IdCard,
+    },
+    {
+      key: 'cltp',
+      label: 'Karyawan CLTP',
+      value: formatNumber(summary.cltp),
+      suffix: '',
+      note: `${percent(summary.cltp).toFixed(1)}% dari hasil filter`,
+      share: percent(summary.cltp),
+      icon: UserRoundCheck,
     },
     {
       key: 'age',
@@ -109,7 +122,7 @@ export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange
       label: 'Jumlah divisi',
       value: formatNumber(summary.units),
       suffix: 'unit',
-      note: 'Divisi pada hasil filter',
+      note: summary.boardUnits.length ? `Di luar ${summary.boardUnits.length} unit Direksi & Komisaris` : 'Divisi pada hasil filter',
       share: undefined,
       icon: Building2,
     },
@@ -121,7 +134,9 @@ export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange
         ? { title: 'Rincian jenis kelamin', data: gender, firstColumn: 'Jenis kelamin' }
         : selectedKpi === 'units'
           ? { title: 'Rincian per unit', data: divisions, firstColumn: 'Divisi / Unit' }
-          : { title: 'Rincian status karyawan', data: statuses, firstColumn: 'Status' }
+          : selectedKpi === 'cltp'
+            ? { title: 'Rincian karyawan CLTP per unit', data: cltpUnits, firstColumn: 'Divisi / Unit' }
+            : { title: 'Rincian status karyawan', data: statuses, firstColumn: 'Status' }
 
   function selectDetail(name: string) {
     if (selectedKpi === 'age') setFilters(current => ({ ...current, ageGroup: [name] }))
@@ -129,6 +144,8 @@ export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange
       const gender = name === 'Laki-laki' ? 'L' : name === 'Perempuan' ? 'P' : 'UNKNOWN'
       setFilters(current => ({ ...current, gender: [gender] }))
     } else if (selectedKpi === 'units') setFilters(current => ({ ...current, division: [name] }))
+    else if (selectedKpi === 'cltp')
+      setFilters(current => ({ ...current, division: [name], status: [...new Set(cltp.map(record => record.status))] }))
     else setFilters(current => ({ ...current, status: [name] }))
     setSelectedKpi(null)
   }
@@ -179,7 +196,7 @@ export function KpiSection({ records, periodTotal, period, asOf, onFiltersChange
               <X size={18} />
             </button>
           </div>
-          <BreakdownBars data={detail.data} total={records.length} onSelect={selectDetail} />
+          <BreakdownBars data={detail.data} total={selectedKpi === 'cltp' ? cltp.length : records.length} onSelect={selectDetail} />
           {selectedKpi === 'total' && (
             <button
               type="button"

@@ -1325,8 +1325,10 @@ body:has(.dashboard-page) {
   color: #071241;
 }
 .dashboard-page .kpi-grid {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 14px;
 }
+
 .dashboard-page .kpi-card {
   position: relative;
   min-width: 0;
@@ -1345,7 +1347,9 @@ body:has(.dashboard-page) {
   box-shadow: 0 7px 19px #19134e12;
   transform: translateY(-1px);
 }
+/* Seven figures: the total takes two columns so every row stays full (8 → 4 → 2 columns). */
 .dashboard-page .kpi-card.kpi-primary {
+  grid-column: span 2;
   background: linear-gradient(137deg, #201762 0%, #125a80 100%);
   color: #fff;
   border-color: transparent;
@@ -1373,6 +1377,9 @@ body:has(.dashboard-page) {
 }
 .dashboard-page .kpi-top > span:first-child {
   max-width: 96px;
+}
+.dashboard-page .kpi-primary .kpi-top > span:first-child {
+  max-width: none;
 }
 .dashboard-page .kpi-icon {
   width: 23px;
@@ -1589,7 +1596,7 @@ body:has(.dashboard-page) {
 }
 @media (max-width: 1350px) {
   .dashboard-page .kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .dashboard-page .status-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -94,18 +94,40 @@ export function filterRecords(records: EmployeeRecord[], filters: WorkforceFilte
   })
 }
 
-export function summarize(records: EmployeeRecord[], asOf: string) {
+/** CLTP employees: still employees and part of every total, but reported as their own figure (HC guidance, Oct 2026). */
+export const isCltp = (record: Pick<EmployeeRecord, 'status'>) => /\bcltp\b/i.test(record.status)
+
+/** Board statuses; the units that hold them (e.g. DIR. UTAMA, DEKOM) sit outside the divisions. */
+const BOARD_STATUS = /^\s*(direksi|komisaris|staf komisaris)\s*$/i
+
+/**
+ * Units outside the divisions: every unit that holds a Direksi, Komisaris or Staf Komisaris. The people in them
+ * (also e.g. "Diperbantukan" in DIR. UTAMA) still count as employees; only the division count leaves the units out.
+ * Pass the whole period so a filter cannot turn such a unit back into a division.
+ */
+export function boardUnits(records: Pick<EmployeeRecord, 'status' | 'division'>[]): Set<string> {
+  return new Set(records.filter(record => record.division && BOARD_STATUS.test(record.status)).map(record => record.division))
+}
+
+export function summarize(records: EmployeeRecord[], asOf: string, outsideDivisions: Set<string> = boardUnits(records)) {
   const ages = records.map(record => fullYears(record.birthDate, asOf)).filter((age): age is number => age !== null)
   const genders = countBy(records, record => genderOf(record))
+  const units = new Set(records.map(record => record.division).filter(Boolean))
+  const boardUnitsHere = [...units].filter(unit => outsideDivisions.has(unit))
   return {
     total: new Set(records.map(record => record.nip)).size,
     active: records.filter(record => record.status === 'Aktif').length,
+    cltp: records.filter(isCltp).length,
+    /** People in the units outside the divisions (Direksi, Komisaris and their staff). */
+    board: records.filter(record => outsideDivisions.has(record.division)).length,
     averageAge: ages.length ? ages.reduce((sum, age) => sum + age, 0) / ages.length : null,
     ageDenominator: ages.length,
     male: genders.find(item => item.name === 'L')?.value ?? 0,
     female: genders.find(item => item.name === 'P')?.value ?? 0,
     unknownGender: genders.find(item => item.name === 'UNKNOWN')?.value ?? 0,
-    units: new Set(records.map(record => record.division).filter(Boolean)).size,
+    /** Divisions only; the Direksi and Komisaris units are counted in boardUnits. */
+    units: units.size - boardUnitsHere.length,
+    boardUnits: boardUnitsHere.sort((a, b) => a.localeCompare(b, 'id')),
   }
 }
 

@@ -3,6 +3,7 @@ import {
   TENURE_GROUPS,
   ageGroup,
   bandMatrix,
+  boardUnits,
   countBy,
   educationOf,
   fullYears,
@@ -14,10 +15,10 @@ import { hasContractColumn, projectContracts } from '../analytics/contracts'
 import type { EmployeeRecord } from '../types/workforce'
 
 /** The same aggregates used by the dashboard, calculated from the active session. */
-export function buildAggregateContext(records: EmployeeRecord[], asOf: string) {
+export function buildAggregateContext(records: EmployeeRecord[], asOf: string, outsideDivisions: Set<string> = boardUnits(records)) {
   return {
     asOf,
-    summary: summarize(records, asOf),
+    summary: summarize(records, asOf, outsideDivisions),
     status: countBy(records, record => record.status),
     gender: countBy(records, record => genderOf(record)),
     education: countBy(records, record => educationOf(record)),
