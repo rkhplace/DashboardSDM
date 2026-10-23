@@ -7,7 +7,7 @@ import { formatNumber } from '../analytics/format'
 import { monthLabel } from '../analytics/periods'
 import { DEFAULT_RETIREMENT_AGE, defaultRetirementStatuses, projectRetirement, type RetirementSettings } from '../analytics/retirement'
 import { compareSnapshots, periodSeries } from '../analytics/trends'
-import { filterRecords } from '../analytics/workforce'
+import { boardUnits, filterRecords } from '../analytics/workforce'
 import { BandMatrix } from '../components/BandMatrix'
 import { ContractPanel, type FollowUpData } from '../components/ContractPanel'
 import { EmployeeTable } from '../components/EmployeeTable'
@@ -58,6 +58,7 @@ export function DashboardPage() {
   }
   const [filters, setFilters] = useState(emptyFilters)
   const records = useMemo(() => filterRecords(snapshot.records, filters, snapshot.asOf), [snapshot, filters])
+  const outsideDivisions = useMemo(() => boardUnits(snapshot.records), [snapshot])
   const statusOptions = useMemo(
     () => [...new Set(snapshot.records.map(record => record.status))].sort((a, b) => a.localeCompare(b, 'id')),
     [snapshot],
@@ -213,6 +214,7 @@ export function DashboardPage() {
         periodTotal={snapshot.records.length}
         period={snapshot.period}
         asOf={snapshot.asOf}
+        boardUnits={outsideDivisions}
         onFiltersChange={setFilters}
       />
       <StatusPanel

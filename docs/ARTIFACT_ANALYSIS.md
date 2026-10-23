@@ -29,7 +29,7 @@
 | INSTITUTE, JURUSAN | teks; 26 dan 44 kosong | riwayat pendidikan terbatas |
 | POSITION | angka unik 202 | kode posisi; bukan jabatan teks |
 
-Nilai status mempunyai 14 kategori, termasuk `Aktif` 52, `PKWT TKB` 44, `PKWT Proyek` 29, `PKWT Umum` 27, dan `CLTP` 19. Ada 3 direktorat dan 10 nilai `DIVISI`, termasuk unit DEKOM/DIR. UTAMA yang tidak selalu bermakna divisi formal. Headcount memakai NIP unik dalam semua 202 baris, bukan penjumlahan `TOTAL`.
+Nilai status mempunyai 14 kategori, termasuk `Aktif` 52, `PKWT TKB` 44, `PKWT Proyek` 29, `PKWT Umum` 27, dan `CLTP` 19. Ada 3 direktorat dan 10 nilai `DIVISI`, termasuk unit DEKOM, DIR. UTAMA, dan PENDUKUNG DEWAN KOMISARIS yang bukan divisi formal; sejak Oktober 2026 KPI jumlah divisi tidak menghitung ketiganya (7 divisi), sedangkan orangnya tetap masuk total karyawan. Headcount memakai NIP unik dalam semua 202 baris, bukan penjumlahan `TOTAL`.
 
 Pemeriksaan kualitas awal: NIP duplikat 0, nama kosong 0, divisi kosong 0, status kosong 0, tanggal lahir/masuk tidak valid 0, band kosong 107, pendidikan kosong 1, `INSTITUTE` kosong 26, `JURUSAN` kosong 44, serta `JENIS JABATAN`/`ACTIVITY`/`FUNGSI BISNIS` masing-masing kosong 100. Nilai `MASKER 1` berupa `#N/A` ada 17 baris dan tidak dipakai untuk perhitungan.
 
@@ -55,7 +55,7 @@ Model konseptual: `Employee` (NIP, nama, lahir, gender, pendidikan), `EmployeeSn
 | Halaman | Isi awal |
 |---|---|
 | Upload Data | halaman awal; pilih workbook, validasi otomatis, langsung buka dashboard bila periode terdeteksi |
-| Dashboard SDM | satu halaman berisi filter bersama, enam KPI, grafik komposisi, tabel status, matriks band, dan daftar karyawan dengan pencarian serta pagination |
+| Dashboard SDM | satu halaman berisi filter bersama, tujuh KPI, grafik komposisi, tabel status, matriks band, dan daftar karyawan dengan pencarian serta pagination |
 
 Komponen saat ini: `FilterBar`, `SnapshotCharts`, `SectionCard`, `EmployeeTable`, tabel distribusi, dan matriks band. Modul AI belum muncul sebagai fitur UI karena data dan integrasinya belum tersedia.
 

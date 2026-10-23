@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { buildAggregateContext } from '../src/ai/context.ts'
-import { filterRecords } from '../src/analytics/workforce.ts'
+import { boardUnits, filterRecords } from '../src/analytics/workforce.ts'
 import { emptyFilters, type EmployeeRecord, type EmployeeSnapshot, type WorkforceFilters } from '../src/types/workforce.ts'
 import { acceptedContentType, parseBody, readStream } from './body.ts'
 import { createTurnTools } from './chatExtras.ts'
@@ -139,6 +139,8 @@ const RULES = [
   'Jangan menebak angka, tren, sebab-akibat, atau fakta individu; alasan keluar dari data hanya indikasi.',
   'Jika pertanyaan lanjutan singkat, gunakan konteks RIWAYAT untuk memahami acuannya.',
   'Bedakan activity (jenis aktivitas) dari division (unit organisasi).',
+  'Unit yang berisi Direksi, Komisaris, atau Staf Komisaris (summary.boardUnits, misalnya DIR. UTAMA dan DEKOM) bukan divisi: jumlah divisi (summary.units) tidak menghitungnya, tetapi orang di unit itu (summary.board) tetap dihitung sebagai karyawan; sebutkan mereka terpisah bila relevan.',
+  'Karyawan CLTP tetap dihitung sebagai karyawan di semua total dan dilaporkan sebagai angka tersendiri (summary.cltp).',
   'Jika file belum memuat tanggal selesai kontrak, sampaikan bahwa kolom itu perlu ditambahkan.',
   'Jika ditanya arti istilah, beri penjelasan umum dan bedakan dari definisi resmi perusahaan.',
   'Jangan menebak kepanjangan singkatan atau kode internal perusahaan yang tidak dijelaskan di data, misalnya nama status seperti CLTP, TKB, Prohire, atau Rehire; tulis apa adanya dan sampaikan bahwa artinya perlu dikonfirmasi ke HC.',
@@ -160,7 +162,7 @@ export function makePrompt(
   retirement?: RetirementSettings,
   extras?: PromptExtras,
 ) {
-  const summary = { period: snapshot.period, ...buildAggregateContext(records, snapshot.asOf) }
+  const summary = { period: snapshot.period, ...buildAggregateContext(records, snapshot.asOf, boardUnits(snapshot.records)) }
   const catalog = workforceCatalog(records, snapshot.asOf)
   const sections = [RULES.join(' '), `PROFIL DATA: ${JSON.stringify(catalog)}`, `RINGKASAN: ${JSON.stringify(summary)}`]
 
